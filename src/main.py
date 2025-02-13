@@ -71,15 +71,18 @@ def show_jobs():
                 type=['pdf', 'docx', 'txt']
             )
 
-            if uploaded_file is not None and title:
+            if uploaded_file is not None:
                 try:
-                    description = extract_text_from_upload(uploaded_file)
                     if st.button("Save Uploaded Job Description"):
-                        db.add_job_description(title, description)
-                        st.success("Job description uploaded and saved successfully!")
-                        # Preview the extracted text
-                        with st.expander("Preview Extracted Text"):
-                            st.text(description)
+                        description = extract_text_from_upload(uploaded_file)
+                        if title and description:
+                            db.add_job_description(title, description)
+                            st.success("Job description uploaded and saved successfully!")
+                            # Preview the extracted text
+                            with st.expander("Preview Extracted Text"):
+                                st.text(description)
+                        else:
+                            st.error("Please provide both a title and upload a file.")
                 except Exception as e:
                     st.error(f"Failed to process uploaded file: {str(e)}")
 

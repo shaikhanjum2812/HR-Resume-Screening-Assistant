@@ -38,7 +38,12 @@ class Database:
         )
         ''')
 
-        # Updated Evaluations table with candidate information
+        # Drop the evaluations table if it exists
+        cursor.execute('''
+            DROP TABLE IF EXISTS evaluations;
+        ''')
+
+        # Recreate the Evaluations table with candidate information
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS evaluations (
             id SERIAL PRIMARY KEY,

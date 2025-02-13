@@ -424,17 +424,30 @@ def show_evaluation():
                     continue
 
                 # Create card for each evaluation
-                with st.expander(f"📄 {eval_data['resume_name']} - {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
-                    cols = st.columns([2, 1, 1])
+                display_name = eval_data['candidate_name'] if eval_data['candidate_name'] else f"Resume: {eval_data['resume_name']}"
+                with st.expander(f"👤 {display_name} - {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
+                    # Display candidate contact info if available
+                    if eval_data['candidate_name'] or eval_data['candidate_email'] or eval_data['candidate_phone']:
+                        st.write("#### Candidate Information")
+                        info_cols = st.columns(3)
+                        with info_cols[0]:
+                            st.write("**Name:**", eval_data['candidate_name'] or "Not available")
+                        with info_cols[1]:
+                            st.write("**Email:**", eval_data['candidate_email'] or "Not available")
+                        with info_cols[2]:
+                            st.write("**Phone:**", eval_data['candidate_phone'] or "Not available")
+                        st.markdown("---")  # Add a separator line
 
-                    with cols[0]:
+                    # Evaluation results
+                    result_cols = st.columns([2, 1, 1])
+                    with result_cols[0]:
                         result = eval_data['result'].upper()
                         if result == 'SHORTLIST':
                             st.success(f"Decision: {result}")
                         else:
                             st.error(f"Decision: {result}")
 
-                    with cols[1]:
+                    with result_cols[1]:
                         st.metric("Match Score", f"{eval_data['match_score']*100:.1f}%")
 
                     # Get detailed evaluation data

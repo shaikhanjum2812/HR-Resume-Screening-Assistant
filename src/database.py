@@ -122,7 +122,9 @@ class Database:
                         project_expertise_score FLOAT,
                         experience_quality_score FLOAT,
                         evaluation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        evaluation_data TEXT
+                        evaluation_data TEXT,
+                        resume_file_data BYTEA,
+                        resume_file_type VARCHAR(255)
                     )
                     ''')
 
@@ -214,7 +216,8 @@ class Database:
         query = 'UPDATE job_descriptions SET active = false WHERE id = %s'
         self.execute_query(query, (job_id,), fetch=False)
 
-    def save_evaluation(self, job_id, resume_name, evaluation_result):
+    def save_evaluation(self, job_id, resume_name, evaluation_result, resume_file=None):
+        """Save evaluation results along with the resume file if provided"""
         query = '''
             INSERT INTO evaluations (
                 job_id, resume_name, 
@@ -227,10 +230,11 @@ class Database:
                 technical_depth, problem_solving_score, project_complexity_score,
                 implementation_experience_score, project_expertise_score,
                 experience_quality_score,
-                evaluation_data
+                evaluation_data,
+                resume_file_data, resume_file_type
             ) VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             )
         '''
 
@@ -238,6 +242,13 @@ class Database:
         evaluation_metrics = evaluation_result.get('evaluation_metrics', {})
         recommendations = evaluation_result.get('recommendations', {})
         technical_assessment = evaluation_result.get('technical_assessment', {})
+
+        # Prepare resume file data if provided
+        resume_file_data = None
+        resume_file_type = None
+        if resume_file:
+            resume_file_data = resume_file.getvalue()
+            resume_file_type = resume_file.type
 
         params = (
             job_id,
@@ -270,10 +281,28 @@ class Database:
             evaluation_metrics.get('implementation_experience', 0.0),
             evaluation_metrics.get('project_expertise', 0.0),
             evaluation_result['years_of_experience'].get('quality_score', 0.0),
-            json.dumps(evaluation_result)
+            json.dumps(evaluation_result),
+            resume_file_data,
+            resume_file_type
         )
 
         self.execute_query(query, params, fetch=False)
+
+    def get_resume_file(self, evaluation_id):
+        """Retrieve resume file data for a specific evaluation"""
+        query = '''
+            SELECT resume_file_data, resume_file_type, resume_name 
+            FROM evaluations 
+            WHERE id = %s
+        '''
+        result = self.execute_query(query, (evaluation_id,))
+        if result and result[0][0]:
+            return {
+                'file_data': result[0][0],
+                'file_type': result[0][1],
+                'file_name': result[0][2]
+            }
+        return None
 
     def get_evaluations_by_date_range(self, start_date, end_date):
         query = '''

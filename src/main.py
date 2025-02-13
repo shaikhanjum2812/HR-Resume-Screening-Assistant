@@ -286,11 +286,12 @@ def show_evaluation():
                         evaluation_criteria=criteria
                     )
 
-                    # Save complete evaluation results
+                    # Save complete evaluation results with the resume file
                     st.session_state.components['db'].save_evaluation(
                         job_id=job['id'],
                         resume_name=uploaded_file.name,
-                        evaluation_result=evaluation
+                        evaluation_result=evaluation,
+                        resume_file=uploaded_file
                     )
 
                     # Display results
@@ -519,11 +520,24 @@ def show_evaluation():
                             # Create downloadable JSON with full evaluation details
                             evaluation_json = json.dumps(details['evaluation_data'], indent=2)
                             st.download_button(
-                                label="📥 Download Detailed Report",
+                                label="📄 Download Evaluation Report",
                                 data=evaluation_json,
                                 file_name=f"evaluation_{eval_data['id']}.json",
                                 mime="application/json"
                             )
+
+                        with dl_cols[1]:
+                            # Get resume file data
+                            resume_file = st.session_state.components['db'].get_resume_file(eval_data['id'])
+                            if resume_file and resume_file['file_data']:
+                                st.download_button(
+                                    label="📥 Download Original Resume",
+                                    data=resume_file['file_data'],
+                                    file_name=resume_file['file_name'],
+                                    mime=resume_file['file_type']
+                                )
+                            else:
+                                st.write("Original resume file not available")
 
             except Exception as e:
                 logger.error(f"Error displaying evaluation: {str(e)}")

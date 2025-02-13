@@ -297,8 +297,10 @@ class Database:
         '''
         result = self.execute_query(query, (evaluation_id,))
         if result and result[0][0]:
+            # Convert memoryview to bytes for proper handling
+            file_data = bytes(result[0][0]) if isinstance(result[0][0], memoryview) else result[0][0]
             return {
-                'file_data': result[0][0],
+                'file_data': file_data,
                 'file_type': result[0][1],
                 'file_name': result[0][2]
             }

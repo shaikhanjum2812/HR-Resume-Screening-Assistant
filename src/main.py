@@ -474,6 +474,42 @@ def show_evaluation():
                         with metric_cols[3]:
                             st.metric("Overall Fit", f"{metrics.get('overall_fit', 0.0)*100:.1f}%")
 
+                        # Technical Assessment Section
+                        st.write("#### Technical Capability Assessment")
+                        tech_cols = st.columns(4)
+                        technical_assessment = details['evaluation_data'].get('technical_assessment', {})
+                        with tech_cols[0]:
+                            st.metric("Technical Depth", f"{technical_assessment.get('technical_depth', 0.0)*100:.1f}%")
+                        with tech_cols[1]:
+                            st.metric("Problem Solving", f"{technical_assessment.get('problem_solving', 0.0)*100:.1f}%")
+                        with tech_cols[2]:
+                            st.metric("Project Complexity", f"{technical_assessment.get('project_complexity', 0.0)*100:.1f}%")
+                        with tech_cols[3]:
+                            st.metric("Implementation Expertise", f"{metrics.get('implementation_experience', 0.0)*100:.1f}%")
+
+                        # Experience Quality Section
+                        st.write("#### Experience Assessment")
+                        exp_quality_cols = st.columns(3)
+                        with exp_quality_cols[0]:
+                            st.metric("Experience Quality", f"{details['years_of_experience'].get('quality_score', 0.0)*100:.1f}%")
+                        with exp_quality_cols[1]:
+                            st.metric("Project Expertise", f"{metrics.get('project_expertise', 0.0)*100:.1f}%")
+                        with exp_quality_cols[2]:
+                            st.metric("Overall Technical Fit", f"{metrics.get('overall_technical_fit', 0.0)*100:.1f}%")
+
+                        # Implementation Experience
+                        if technical_assessment.get('implementation_experience'):
+                            st.write("#### Implementation Experience")
+                            for exp in technical_assessment['implementation_experience']:
+                                st.write(f"• {exp}")
+
+                        # Project Experience
+                        if details['key_matches'].get('projects'):
+                            st.write("#### Relevant Projects")
+                            for project in details['key_matches']['projects']:
+                                st.write(f"• {project}")
+
+
                         # Experience Analysis
                         st.write("#### Experience Analysis")
                         exp_cols = st.columns(3)

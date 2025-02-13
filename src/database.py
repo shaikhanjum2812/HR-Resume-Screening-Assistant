@@ -224,13 +224,20 @@ class Database:
                 meets_experience_requirement, key_matches, missing_requirements,
                 experience_analysis, technical_skills_score, experience_relevance_score,
                 education_match_score, overall_fit_score, interview_focus, skill_gaps,
+                technical_depth, problem_solving_score, project_complexity_score,
+                implementation_experience_score, project_expertise_score,
+                experience_quality_score,
                 evaluation_data
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            )
         '''
 
         candidate_info = evaluation_result.get('candidate_info', {})
         evaluation_metrics = evaluation_result.get('evaluation_metrics', {})
         recommendations = evaluation_result.get('recommendations', {})
+        technical_assessment = evaluation_result.get('technical_assessment', {})
 
         params = (
             job_id,
@@ -254,9 +261,15 @@ class Database:
             evaluation_metrics.get('technical_skills', 0.0),
             evaluation_metrics.get('experience_relevance', 0.0),
             evaluation_metrics.get('education_match', 0.0),
-            evaluation_metrics.get('overall_fit', 0.0),
+            evaluation_metrics.get('overall_technical_fit', 0.0),
             json.dumps(recommendations.get('interview_focus', [])),
             json.dumps(recommendations.get('skill_gaps', [])),
+            technical_assessment.get('technical_depth', 0.0),
+            technical_assessment.get('problem_solving', 0.0),
+            technical_assessment.get('project_complexity', 0.0),
+            evaluation_metrics.get('implementation_experience', 0.0),
+            evaluation_metrics.get('project_expertise', 0.0),
+            evaluation_result['years_of_experience'].get('quality_score', 0.0),
             json.dumps(evaluation_result)
         )
 

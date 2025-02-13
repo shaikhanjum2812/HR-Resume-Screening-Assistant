@@ -55,73 +55,82 @@ class AIEvaluator:
             candidate_info = self.extract_candidate_info(resume_text)
 
             # Build dynamic system message based on evaluation criteria
-            system_message = """You are an expert HR evaluator with the following capabilities:
-            1. Deep understanding of industry-specific requirements
-            2. Ability to assess both technical and soft skills
-            3. Experience evaluation across different seniority levels
+            system_message = """You are an expert technical recruiter with these priorities:
+            1. Focus on practical implementation experience and technical depth over years of experience
+            2. Value quality of projects and technical contributions over duration
+            3. Consider transferable skills and adaptability
+            4. Look for evidence of hands-on implementation experience
 
             Analyze the resume against the job description and return your evaluation EXACTLY as a JSON object 
             with the following structure:
             {
                 "decision": "shortlist" or "reject",
                 "confidence_score": float between 0 and 1,
-                "justification": "detailed explanation including specific gaps",
+                "justification": "detailed explanation focusing on technical capabilities",
                 "match_score": float between 0 and 1,
                 "years_of_experience": {
                     "total": float,
                     "relevant": float,
                     "required": float,
                     "meets_requirement": boolean,
-                    "details": "breakdown of experience by relevance"
+                    "quality_score": float between 0 and 1,
+                    "details": "analysis focusing on quality of experience over duration"
+                },
+                "technical_assessment": {
+                    "implementation_experience": ["specific examples of hands-on implementation"],
+                    "technical_depth": float between 0 and 1,
+                    "problem_solving": float between 0 and 1,
+                    "project_complexity": float between 0 and 1
                 },
                 "key_matches": {
                     "skills": ["list of matching technical skills"],
-                    "experience": ["list of relevant experience matches"],
-                    "certifications": ["list of relevant certifications"]
+                    "projects": ["relevant project experiences"],
+                    "implementations": ["specific implementation examples"],
+                    "certifications": ["relevant certifications"]
                 },
                 "missing_requirements": {
-                    "critical": ["list of critical missing requirements"],
+                    "critical": ["list of critical missing technical requirements"],
                     "preferred": ["list of preferred but missing requirements"]
                 },
                 "recommendations": {
-                    "interview_focus": ["specific areas to focus on during interview"],
-                    "skill_gaps": ["recommended areas for skill development"]
+                    "interview_focus": ["specific technical areas to focus on during interview"],
+                    "skill_gaps": ["recommended areas for technical development"],
+                    "project_suggestions": ["suggested project types to gain experience"]
                 },
                 "evaluation_metrics": {
                     "technical_skills": float between 0 and 1,
-                    "experience_relevance": float between 0 and 1,
-                    "education_match": float between 0 and 1,
-                    "overall_fit": float between 0 and 1
+                    "implementation_experience": float between 0 and 1,
+                    "project_expertise": float between 0 and 1,
+                    "problem_solving": float between 0 and 1,
+                    "overall_technical_fit": float between 0 and 1
                 }
             }
-            Only return the JSON object, nothing else."""
+            Only return the JSON object, nothing else.
+
+            Important Guidelines:
+            1. Prioritize hands-on implementation experience over years of experience
+            2. Look for evidence of completed projects and technical depth
+            3. Consider transferable skills from different technologies
+            4. Value problem-solving ability and technical adaptability
+            5. Don't reject solely based on years of experience if technical skills are strong"""
 
             if evaluation_criteria:
-                system_message += "\n\nSpecific Evaluation Criteria:"
-
+                system_message += "\n\nEvaluation Adjustments:"
                 if evaluation_criteria.get('min_years_experience'):
-                    system_message += f"\n- Minimum {evaluation_criteria['min_years_experience']} years of experience required"
+                    system_message += f"\n- Treat {evaluation_criteria['min_years_experience']} years as a flexible guideline, not a hard requirement"
+                    system_message += "\n- Focus more on the quality and depth of experience rather than duration"
 
                 if evaluation_criteria.get('required_skills'):
-                    system_message += "\n- Required Skills:"
+                    system_message += "\n- Required Technical Skills (prioritize implementation experience):"
                     for skill in evaluation_criteria['required_skills']:
                         system_message += f"\n  * {skill}"
 
                 if evaluation_criteria.get('preferred_skills'):
-                    system_message += "\n- Preferred Skills:"
+                    system_message += "\n- Preferred Technical Skills:"
                     for skill in evaluation_criteria['preferred_skills']:
                         system_message += f"\n  * {skill}"
 
-                if evaluation_criteria.get('education_requirements'):
-                    system_message += f"\n- Education Requirements:\n  {evaluation_criteria['education_requirements']}"
-
-                if evaluation_criteria.get('company_background_requirements'):
-                    system_message += f"\n- Company Background Requirements:\n  {evaluation_criteria['company_background_requirements']}"
-
-                if evaluation_criteria.get('domain_experience_requirements'):
-                    system_message += f"\n- Domain Experience Requirements:\n  {evaluation_criteria['domain_experience_requirements']}"
-
-            # First evaluation with GPT-4 Turbo
+            # Evaluation with GPT-4 Turbo
             response = self.client.chat.completions.create(
                 model="gpt-4-turbo-preview",
                 messages=[
@@ -145,8 +154,8 @@ class AIEvaluator:
 
             # Validate response format
             required_keys = [
-                'decision', 'justification', 'match_score', 'key_matches', 
-                'missing_requirements', 'years_of_experience', 'evaluation_metrics'
+                'decision', 'justification', 'match_score', 'technical_assessment',
+                'key_matches', 'missing_requirements', 'evaluation_metrics'
             ]
             if not all(key in result for key in required_keys):
                 raise ValueError("Invalid response format from OpenAI API")

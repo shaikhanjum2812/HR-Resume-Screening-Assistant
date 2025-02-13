@@ -338,17 +338,6 @@ def show_evaluation():
                     if 'experience_analysis' in evaluation:
                         st.write("**Experience Analysis:**", evaluation['experience_analysis'])
 
-                    # Skills and Requirements
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write("**Matching Skills/Qualifications:**")
-                        for skill in evaluation.get('key_matches', []):
-                            st.write("✓", skill)
-
-                    with col2:
-                        st.write("**Missing Requirements:**")
-                        for req in evaluation.get('missing_requirements', []):
-                            st.write("✗", req)
 
     with tab2:
         st.subheader("Evaluations")
@@ -509,7 +498,6 @@ def show_evaluation():
                             for project in details['key_matches']['projects']:
                                 st.write(f"• {project}")
 
-
                         # Experience Analysis
                         st.write("#### Experience Analysis")
                         exp_cols = st.columns(3)
@@ -524,58 +512,6 @@ def show_evaluation():
                         st.write("#### Evaluation Summary")
                         st.write(details['justification'])
 
-                        # Skills and Requirements
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.write("**Matching Skills:**")
-                            key_matches = details['key_matches']
-                            if isinstance(key_matches, dict):
-                                if key_matches.get('skills'):
-                                    st.write("*Technical Skills:*")
-                                    for skill in key_matches['skills']:
-                                        st.write(f"✓ {skill}")
-                                if key_matches.get('experience'):
-                                    st.write("*Relevant Experience:*")
-                                    for exp in key_matches['experience']:
-                                        st.write(f"✓ {exp}")
-                                if key_matches.get('certifications'):
-                                    st.write("*Certifications:*")
-                                    for cert in key_matches['certifications']:
-                                        st.write(f"✓ {cert}")
-                            else:
-                                for match in key_matches:
-                                    st.write(f"✓ {match}")
-
-                        with col2:
-                            st.write("**Missing Requirements:**")
-                            missing_reqs = details['missing_requirements']
-                            if isinstance(missing_reqs, dict):
-                                if missing_reqs.get('critical'):
-                                    st.write("*Critical Requirements:*")
-                                    for req in missing_reqs['critical']:
-                                        st.write(f"✗ {req}")
-                                if missing_reqs.get('preferred'):
-                                    st.write("*Preferred Requirements:*")
-                                    for req in missing_reqs['preferred']:
-                                        st.write(f"✗ {req}")
-                            else:
-                                for req in missing_reqs:
-                                    st.write(f"✗ {req}")
-
-                        # Recommendations
-                        st.write("#### Recommendations")
-                        rec_cols = st.columns(2)
-                        with rec_cols[0]:
-                            st.write("**Interview Focus Areas:**")
-                            interview_focus = json.loads(details.get('interview_focus', '[]'))
-                            for focus in interview_focus:
-                                st.write(f"• {focus}")
-
-                        with rec_cols[1]:
-                            st.write("**Skill Development Areas:**")
-                            skill_gaps = json.loads(details.get('skill_gaps', '[]'))
-                            for gap in skill_gaps:
-                                st.write(f"• {gap}")
 
                         # Download buttons
                         dl_cols = st.columns(2)

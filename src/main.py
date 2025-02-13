@@ -44,49 +44,55 @@ def show_jobs():
     st.title("Job Descriptions Management")
 
     # Add new job description
-    with st.expander("Add New Job Description", expanded=True):
-        # Method selection
-        input_method = st.radio(
-            "Choose input method",
-            ["Manual Entry", "Upload File"],
-            horizontal=True
+    st.subheader("Add New Job Description")
+
+    # Method selection
+    input_method = st.radio(
+        "Choose input method",
+        ["Manual Entry", "Upload File"],
+        horizontal=True
+    )
+
+    if input_method == "Manual Entry":
+        title = st.text_input("Job Title")
+        description = st.text_area("Job Description")
+        submit_button = st.button("Save Job Description")
+
+        if submit_button and title and description:
+            try:
+                db.add_job_description(title, description)
+                st.success("Job description added successfully!")
+            except Exception as e:
+                st.error(f"Failed to save job description: {str(e)}")
+
+    else:  # File Upload
+        title = st.text_input("Job Title")
+        uploaded_file = st.file_uploader(
+            "Upload Job Description (PDF, DOCX, or TXT)",
+            type=['pdf', 'docx', 'txt']
         )
 
-        if input_method == "Manual Entry":
-            title = st.text_input("Job Title")
-            description = st.text_area("Job Description")
-            submit_button = st.button("Save Job Description")
+        if uploaded_file is not None:
+            try:
+                if st.button("Save Uploaded Job Description"):
+                    if not title:
+                        st.error("Please provide a title for the job description.")
+                        return
 
-            if submit_button and title and description:
-                try:
-                    db.add_job_description(title, description)
-                    st.success("Job description added successfully!")
-                except Exception as e:
-                    st.error(f"Failed to save job description: {str(e)}")
-
-        else:  # File Upload
-            title = st.text_input("Job Title")
-            uploaded_file = st.file_uploader(
-                "Upload Job Description (PDF, DOCX, or TXT)",
-                type=['pdf', 'docx', 'txt']
-            )
-
-            if uploaded_file is not None:
-                try:
-                    if st.button("Save Uploaded Job Description"):
-                        description = extract_text_from_upload(uploaded_file)
-                        if title and description:
-                            db.add_job_description(title, description)
-                            st.success("Job description uploaded and saved successfully!")
-                            # Preview the extracted text
-                            with st.expander("Preview Extracted Text"):
-                                st.text(description)
-                        else:
-                            st.error("Please provide both a title and upload a file.")
-                except Exception as e:
-                    st.error(f"Failed to process uploaded file: {str(e)}")
+                    description = extract_text_from_upload(uploaded_file)
+                    if description:
+                        db.add_job_description(title, description)
+                        st.success("Job description uploaded and saved successfully!")
+                        # Show preview in a container
+                        st.subheader("Extracted Text Preview")
+                        st.text_area("Preview", description, height=200, disabled=True)
+                    else:
+                        st.error("No text could be extracted from the file.")
+            except Exception as e:
+                st.error(f"Failed to process uploaded file: {str(e)}")
 
     # List existing job descriptions
+    st.markdown("---")  # Add a visual separator
     st.subheader("Existing Job Descriptions")
     jobs = db.get_all_jobs()
     for job in jobs:

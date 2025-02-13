@@ -225,18 +225,22 @@ def show_evaluation():
                 # Extract text from PDF
                 resume_text = pdf_processor.extract_text(uploaded_file)
 
-                # Get job description
+                # Get job description and criteria
                 job = next(job for job in jobs if job['title'] == selected_job)
+                criteria = db.get_evaluation_criteria(job['id']) if job['has_criteria'] else None
 
                 # Evaluate with AI
-                evaluation = ai_evaluator.evaluate_resume(resume_text, job['description'])
+                evaluation = ai_evaluator.evaluate_resume(
+                    resume_text, 
+                    job['description'],
+                    evaluation_criteria=criteria
+                )
 
-                # Save evaluation
+                # Save complete evaluation results
                 db.save_evaluation(
                     job_id=job['id'],
                     resume_name=uploaded_file.name,
-                    result=evaluation['decision'],
-                    justification=evaluation['justification']
+                    evaluation_result=evaluation
                 )
 
                 # Display results

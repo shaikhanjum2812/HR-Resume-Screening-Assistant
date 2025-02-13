@@ -37,7 +37,7 @@ class Database:
         )
         ''')
 
-        # Evaluations table
+        # Enhanced Evaluations table with additional fields
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS evaluations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,7 +45,16 @@ class Database:
             resume_name TEXT NOT NULL,
             result TEXT NOT NULL,
             justification TEXT NOT NULL,
+            match_score REAL,
+            years_experience_total REAL,
+            years_experience_relevant REAL,
+            years_experience_required REAL,
+            meets_experience_requirement BOOLEAN,
+            key_matches TEXT,
+            missing_requirements TEXT,
+            experience_analysis TEXT,
             evaluation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            evaluation_data TEXT,
             FOREIGN KEY (job_id) REFERENCES job_descriptions (id)
         )
         ''')
@@ -110,14 +119,34 @@ class Database:
         )
         self.conn.commit()
 
-    def save_evaluation(self, job_id, resume_name, result, justification):
+    def save_evaluation(self, job_id, resume_name, evaluation_result):
+        """
+        Save the complete evaluation results to the database
+        """
         cursor = self.conn.cursor()
-        cursor.execute(
-            '''INSERT INTO evaluations 
-            (job_id, resume_name, result, justification) 
-            VALUES (?, ?, ?, ?)''',
-            (job_id, resume_name, result, justification)
-        )
+        cursor.execute('''
+            INSERT INTO evaluations (
+                job_id, resume_name, result, justification,
+                match_score, years_experience_total, years_experience_relevant,
+                years_experience_required, meets_experience_requirement,
+                key_matches, missing_requirements, experience_analysis,
+                evaluation_data
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            job_id,
+            resume_name,
+            evaluation_result['decision'],
+            evaluation_result['justification'],
+            evaluation_result['match_score'],
+            evaluation_result['years_of_experience']['total'],
+            evaluation_result['years_of_experience']['relevant'],
+            evaluation_result['years_of_experience']['required'],
+            evaluation_result['years_of_experience']['meets_requirement'],
+            json.dumps(evaluation_result['key_matches']),
+            json.dumps(evaluation_result['missing_requirements']),
+            evaluation_result['experience_analysis'],
+            json.dumps(evaluation_result)  # Store complete evaluation data as JSON
+        ))
         self.conn.commit()
 
     def get_evaluations_by_period(self, period):
@@ -167,5 +196,34 @@ class Database:
                 'company_background_requirements': criteria[6],
                 'domain_experience_requirements': criteria[7],
                 'additional_instructions': criteria[8]
+            }
+        return None
+
+    def get_evaluation_details(self, evaluation_id):
+        """
+        Retrieve detailed evaluation results
+        """
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT * FROM evaluations WHERE id = ?
+        ''', (evaluation_id,))
+        eval_data = cursor.fetchone()
+        if eval_data:
+            return {
+                'id': eval_data[0],
+                'job_id': eval_data[1],
+                'resume_name': eval_data[2],
+                'result': eval_data[3],
+                'justification': eval_data[4],
+                'match_score': eval_data[5],
+                'years_experience_total': eval_data[6],
+                'years_experience_relevant': eval_data[7],
+                'years_experience_required': eval_data[8],
+                'meets_experience_requirement': bool(eval_data[9]),
+                'key_matches': json.loads(eval_data[10]),
+                'missing_requirements': json.loads(eval_data[11]),
+                'experience_analysis': eval_data[12],
+                'evaluation_date': eval_data[13],
+                'evaluation_data': json.loads(eval_data[14])
             }
         return None

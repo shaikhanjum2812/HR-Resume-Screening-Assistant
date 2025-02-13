@@ -54,16 +54,54 @@ def show_jobs():
     )
 
     if input_method == "Manual Entry":
-        title = st.text_input("Job Title")
-        description = st.text_area("Job Description")
-        submit_button = st.button("Save Job Description")
+        with st.form("job_description_form"):
+            title = st.text_input("Job Title")
+            description = st.text_area("Job Description")
 
-        if submit_button and title and description:
-            try:
-                db.add_job_description(title, description)
-                st.success("Job description added successfully!")
-            except Exception as e:
-                st.error(f"Failed to save job description: {str(e)}")
+            # Evaluation Criteria Section
+            st.subheader("Evaluation Criteria")
+            col1, col2 = st.columns(2)
+
+            with col1:
+                min_years = st.number_input("Minimum Years of Experience", min_value=0, value=0)
+                required_skills = st.text_area(
+                    "Required Skills (one per line)",
+                    help="Enter each required skill on a new line"
+                )
+                education_req = st.text_area("Education Requirements")
+
+            with col2:
+                preferred_skills = st.text_area(
+                    "Preferred Skills (one per line)",
+                    help="Enter each preferred skill on a new line"
+                )
+                company_background = st.text_area("Company Background Requirements")
+                domain_experience = st.text_area("Domain Experience Requirements")
+
+            additional_instructions = st.text_area(
+                "Additional Evaluation Instructions",
+                help="Any specific instructions for the AI evaluator"
+            )
+
+            submit_button = st.form_submit_button("Save Job Description")
+
+            if submit_button and title and description:
+                try:
+                    # Prepare evaluation criteria
+                    evaluation_criteria = {
+                        'min_years_experience': min_years,
+                        'required_skills': [s.strip() for s in required_skills.split('\n') if s.strip()],
+                        'preferred_skills': [s.strip() for s in preferred_skills.split('\n') if s.strip()],
+                        'education_requirements': education_req,
+                        'company_background_requirements': company_background,
+                        'domain_experience_requirements': domain_experience,
+                        'additional_instructions': additional_instructions
+                    }
+
+                    db.add_job_description(title, description, evaluation_criteria)
+                    st.success("Job description and evaluation criteria saved successfully!")
+                except Exception as e:
+                    st.error(f"Failed to save job description: {str(e)}")
 
     else:  # File Upload
         title = st.text_input("Job Title")
@@ -83,7 +121,6 @@ def show_jobs():
                     if description:
                         db.add_job_description(title, description)
                         st.success("Job description uploaded and saved successfully!")
-                        # Show preview in a container
                         st.subheader("Extracted Text Preview")
                         st.text_area("Preview", description, height=200, disabled=True)
                     else:
@@ -92,12 +129,39 @@ def show_jobs():
                 st.error(f"Failed to process uploaded file: {str(e)}")
 
     # List existing job descriptions
-    st.markdown("---")  # Add a visual separator
+    st.markdown("---")
     st.subheader("Existing Job Descriptions")
     jobs = db.get_all_jobs()
     for job in jobs:
         with st.expander(f"{job['title']} - {job['date_created']}"):
             st.write(job['description'])
+
+            # Show evaluation criteria if exists
+            if job['has_criteria']:
+                criteria = db.get_evaluation_criteria(job['id'])
+                if criteria:
+                    st.subheader("Evaluation Criteria")
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.write("**Required Skills:**")
+                        for skill in criteria['required_skills']:
+                            st.write(f"- {skill}")
+
+                        st.write("**Education Requirements:**")
+                        st.write(criteria['education_requirements'])
+
+                    with col2:
+                        st.write("**Preferred Skills:**")
+                        for skill in criteria['preferred_skills']:
+                            st.write(f"- {skill}")
+
+                        st.write("**Domain Experience:**")
+                        st.write(criteria['domain_experience_requirements'])
+
+                    st.write("**Additional Instructions:**")
+                    st.write(criteria['additional_instructions'])
+
             if st.button(f"Delete {job['title']}", key=f"del_{job['id']}"):
                 db.delete_job(job['id'])
                 st.experimental_rerun()

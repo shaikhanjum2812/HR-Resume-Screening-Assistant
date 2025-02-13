@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from database import Database
 from ai_evaluator import AIEvaluator
@@ -211,8 +211,8 @@ def show_jobs():
 def show_evaluation():
     st.title("Resume Evaluation")
 
-    # Create tabs for new evaluation and past evaluations
-    tab1, tab2 = st.tabs(["New Evaluation", "Past Evaluations"])
+    # Create tabs for new evaluation and evaluations list
+    tab1, tab2 = st.tabs(["New Evaluation", "Evaluations"])
 
     with tab1:
         # Job selection
@@ -290,84 +290,140 @@ def show_evaluation():
                         st.write("**Missing Requirements:**")
                         for req in evaluation['missing_requirements']:
                             st.write("✗", req)
+                    st.session_state.evaluation_complete = True
 
     with tab2:
-        st.subheader("Past Evaluations")
+        st.subheader("Evaluations")
 
-        # Time period filter
-        period = st.selectbox(
-            "Filter by time period",
-            ["Week", "Month", "Year", "All Time"],
-            key="eval_period"
-        )
+        # Period filter
+        col1, col2 = st.columns([2, 3])
+        with col1:
+            period = st.selectbox(
+                "Quick Filter",
+                ["Past Week", "Past Month", "Past Quarter", "Custom Range"],
+                key="eval_period"
+            )
 
-        # Get evaluations data
-        evaluations = db.get_evaluations_by_period(period.lower())
+        # Custom date range
+        if period == "Custom Range":
+            with col2:
+                col3, col4 = st.columns(2)
+                with col3:
+                    start_date = st.date_input(
+                        "Start Date",
+                        value=datetime.now() - timedelta(days=7),
+                        max_value=datetime.now()
+                    )
+                with col4:
+                    end_date = st.date_input(
+                        "End Date",
+                        value=datetime.now(),
+                        max_value=datetime.now()
+                    )
+                if start_date > end_date:
+                    st.error("Start date must be before end date")
+                    return
+            evaluations = db.get_evaluations_by_date_range(start_date, end_date)
+        else:
+            # Convert period to database format
+            period_map = {
+                "Past Week": "week",
+                "Past Month": "month",
+                "Past Quarter": "quarter"
+            }
+            evaluations = db.get_evaluations_by_period(period_map[period])
 
-        # Create a DataFrame for better display
+        if not evaluations:
+            st.info("No evaluations found for the selected period.")
+            return
+
+        # Create DataFrame for display
         eval_data = []
-        for eval_record in evaluations:
+        for idx, eval_record in enumerate(evaluations, 1):
             try:
                 eval_data.append({
-                    'Date': eval_record[13],  # evaluation_date
-                    'Resume': eval_record[2],  # resume_name
+                    'Sr No': idx,
+                    'Name': eval_record[2],  # resume_name
                     'Job Title': eval_record[15],  # job_title from JOIN
-                    'Decision': eval_record[3],  # result
-                    'Match Score': f"{float(eval_record[5])*100:.1f}%" if eval_record[5] is not None else "N/A",  # match_score
+                    'Shortlisted': "Yes" if eval_record[3] == "shortlist" else "No",  # result
+                    'Score': f"{float(eval_record[5])*100:.1f}%" if eval_record[5] is not None else "N/A",  # match_score
+                    'Justification': eval_record[4],  # justification
                     'ID': eval_record[0]  # evaluation id
                 })
             except (IndexError, TypeError) as e:
                 st.error(f"Error processing evaluation record: {str(e)}")
                 continue
 
-        if not eval_data:
-            st.info("No evaluations found for the selected period.")
-            return
-
+        # Create DataFrame
         df = pd.DataFrame(eval_data)
 
-        # Display table with expandable rows
+        # Create the table display
+        st.dataframe(
+            df[['Sr No', 'Name', 'Job Title', 'Shortlisted', 'Score']],
+            hide_index=True
+        )
+
+        # Modal window for justification
+        if 'show_justification' not in st.session_state:
+            st.session_state.show_justification = False
+            st.session_state.selected_eval = None
+
+        # Button to show justification for each row
         for idx, row in df.iterrows():
-            with st.expander(
-                f"{row['Date']} - {row['Resume']} ({row['Job Title']}) - {row['Decision'].upper()}"
-            ):
-                # Retrieve full evaluation details
-                details = db.get_evaluation_details(row['ID'])
-                if details:  # Add null check
+            if st.button(f"View Details #{row['Sr No']}", key=f"view_{row['ID']}"):
+                st.session_state.show_justification = True
+                st.session_state.selected_eval = row['ID']
+
+        # Show modal with justification
+        if st.session_state.show_justification and st.session_state.selected_eval:
+            with st.expander("Evaluation Details", expanded=True):
+                details = db.get_evaluation_details(st.session_state.selected_eval)
+                if details:
                     try:
-                        # Display detailed information
+                        st.write("### Evaluation Summary")
+                        cols = st.columns([2, 1, 1])
+                        with cols[0]:
+                            st.metric("Match Score", details['match_score'])
+                        with cols[1]:
+                            st.metric("Total Experience", f"{details['years_experience_total']} years")
+                        with cols[2]:
+                            st.metric("Relevant Experience", f"{details['years_experience_relevant']} years")
+
+                        st.write("### Decision")
+                        if details['result'] == 'shortlist':
+                            st.success(f"Decision: {details['result'].upper()}")
+                        else:
+                            st.error(f"Decision: {details['result'].upper()}")
+
+                        st.write("### Justification")
+                        st.write(details['justification'])
+
+                        st.write("### Experience Analysis")
+                        st.write(details['experience_analysis'])
+
                         col1, col2 = st.columns(2)
                         with col1:
-                            st.metric("Match Score", row['Match Score'])
-                            st.write("**Decision:**", details['result'].upper())
-                            st.write("**Total Experience:**", f"{details['years_experience_total']} years")
-                            st.write("**Relevant Experience:**", f"{details['years_experience_relevant']} years")
+                            st.write("### Key Matches")
+                            for skill in details['key_matches']:
+                                st.write(f"✓ {skill}")
 
                         with col2:
-                            if details['meets_experience_requirement']:
-                                st.success("✓ Meets Experience Requirement")
-                            else:
-                                st.error("✗ Does Not Meet Experience Requirement")
-                            st.write("**Required Experience:**", f"{details['years_experience_required']} years")
-
-                        st.write("**Justification:**", details['justification'])
-                        st.write("**Experience Analysis:**", details['experience_analysis'])
-
-                        col3, col4 = st.columns(2)
-                        with col3:
-                            st.write("**Matching Skills:**")
-                            for skill in details['key_matches']:
-                                st.write("✓", skill)
-
-                        with col4:
-                            st.write("**Missing Requirements:**")
+                            st.write("### Missing Requirements")
                             for req in details['missing_requirements']:
-                                st.write("✗", req)
+                                st.write(f"✗ {req}")
+
+                        if st.button("Close Details"):
+                            st.session_state.show_justification = False
+                            st.session_state.selected_eval = None
+                            st.experimental_rerun()
                     except Exception as e:
                         st.error(f"Error displaying evaluation details: {str(e)}")
                 else:
                     st.warning("Detailed evaluation data not available for this record.")
-
+                    if st.button("Close"):
+                        st.session_state.show_justification = False
+                        st.session_state.selected_eval = None
+                        st.experimental_rerun()
 
 def show_analytics():
     st.title("Analytics Dashboard")

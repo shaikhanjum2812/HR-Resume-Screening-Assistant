@@ -155,6 +155,8 @@ class Database:
             time_filter = "INTERVAL '7 days'"
         elif period == 'month':
             time_filter = "INTERVAL '30 days'"
+        elif period == 'quarter':
+            time_filter = "INTERVAL '90 days'"
         else:  # year
             time_filter = "INTERVAL '365 days'"
 
@@ -171,6 +173,23 @@ class Database:
             WHERE e.evaluation_date >= NOW() - {time_filter}
             ORDER BY e.evaluation_date DESC
         ''')
+        return cursor.fetchall()
+
+    def get_evaluations_by_date_range(self, start_date, end_date):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT 
+                e.id, e.job_id, e.resume_name, e.result, e.justification,
+                e.match_score, e.years_experience_total, e.years_experience_relevant,
+                e.years_experience_required, e.meets_experience_requirement,
+                e.key_matches, e.missing_requirements, e.experience_analysis,
+                e.evaluation_date, e.evaluation_data,
+                j.title as job_title
+            FROM evaluations e
+            JOIN job_descriptions j ON e.job_id = j.id
+            WHERE DATE(e.evaluation_date) BETWEEN %s AND %s
+            ORDER BY e.evaluation_date DESC
+        ''', (start_date, end_date))
         return cursor.fetchall()
 
     def get_active_jobs_count(self):

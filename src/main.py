@@ -297,6 +297,30 @@ def show_evaluation():
                     # Display results
                     st.success("Evaluation Complete!")
 
+                    # Download buttons section
+                    st.subheader("Download Options")
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        # Create downloadable JSON with full evaluation details
+                        evaluation_json = json.dumps(evaluation, indent=2)
+                        st.download_button(
+                            label="📄 Download Evaluation Report",
+                            data=evaluation_json,
+                            file_name=f"evaluation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                            mime="application/json",
+                            key="download_eval"
+                        )
+
+                    with col2:
+                        st.download_button(
+                            label="📥 Download Original Resume",
+                            data=uploaded_file.getvalue(),
+                            file_name=uploaded_file.name,
+                            mime=uploaded_file.type,
+                            key="download_resume"
+                        )
+
                     # Candidate Information Section
                     st.subheader("Candidate Information")
                     candidate_info = evaluation.get('candidate_info', {})

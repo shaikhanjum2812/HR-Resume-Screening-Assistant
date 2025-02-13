@@ -67,8 +67,8 @@ def show_jobs():
         else:  # File Upload
             title = st.text_input("Job Title")
             uploaded_file = st.file_uploader(
-                "Upload Job Description (PDF or TXT)",
-                type=['pdf', 'txt']
+                "Upload Job Description (PDF, DOCX, or TXT)",
+                type=['pdf', 'docx', 'txt']
             )
 
             if uploaded_file is not None and title:

@@ -458,6 +458,36 @@ def show_evaluation():
                     # Get detailed evaluation data
                     details = st.session_state.components['db'].get_evaluation_details(eval_data['id'])
                     if details:
+                        # Download buttons section - Moved to top of card
+                        st.write("#### Download Options")
+                        dl_cols = st.columns(2)
+                        with dl_cols[0]:
+                            # Create downloadable JSON with full evaluation details
+                            evaluation_json = json.dumps(details['evaluation_data'], indent=2)
+                            st.download_button(
+                                label="📄 Download Evaluation Report",
+                                data=evaluation_json,
+                                file_name=f"evaluation_{eval_data['id']}.json",
+                                mime="application/json",
+                                key=f"eval_download_{eval_data['id']}"  # Unique key for each button
+                            )
+
+                        with dl_cols[1]:
+                            # Get resume file data
+                            resume_file = st.session_state.components['db'].get_resume_file(eval_data['id'])
+                            if resume_file and resume_file['file_data']:
+                                st.download_button(
+                                    label="📥 Download Original Resume",
+                                    data=resume_file['file_data'],
+                                    file_name=resume_file['file_name'],
+                                    mime=resume_file['file_type'],
+                                    key=f"resume_download_{eval_data['id']}"  # Unique key for each button
+                                )
+                            else:
+                                st.write("Original resume file not available")
+
+                        st.markdown("---")  # Add a separator line
+
                         # Overall Decision and Scores
                         st.write("#### Overall Assessment")
                         metrics_cols = st.columns(4)
@@ -537,31 +567,6 @@ def show_evaluation():
                         st.write("#### Evaluation Summary")
                         st.write(details['justification'])
 
-
-                        # Download buttons
-                        dl_cols = st.columns(2)
-                        with dl_cols[0]:
-                            # Create downloadable JSON with full evaluation details
-                            evaluation_json = json.dumps(details['evaluation_data'], indent=2)
-                            st.download_button(
-                                label="📄 Download Evaluation Report",
-                                data=evaluation_json,
-                                file_name=f"evaluation_{eval_data['id']}.json",
-                                mime="application/json"
-                            )
-
-                        with dl_cols[1]:
-                            # Get resume file data
-                            resume_file = st.session_state.components['db'].get_resume_file(eval_data['id'])
-                            if resume_file and resume_file['file_data']:
-                                st.download_button(
-                                    label="📥 Download Original Resume",
-                                    data=resume_file['file_data'],
-                                    file_name=resume_file['file_name'],
-                                    mime=resume_file['file_type']
-                                )
-                            else:
-                                st.write("Original resume file not available")
 
             except Exception as e:
                 logger.error(f"Error displaying evaluation: {str(e)}")

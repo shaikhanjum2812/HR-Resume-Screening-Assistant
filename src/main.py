@@ -534,18 +534,28 @@ def show_evaluation():
                         # Experience Quality Section
                         st.write("#### Experience Assessment")
                         exp_quality_cols = st.columns(3)
+                        exp_data = details['evaluation_data'].get('years_of_experience', {})
+                        metrics = details['evaluation_data'].get('evaluation_metrics', {})
+
                         with exp_quality_cols[0]:
-                            st.metric("Experience Quality", f"{details['years_of_experience'].get('quality_score', 0.0)*100:.1f}%")
+                            st.metric("Experience Quality", f"{exp_data.get('quality_score', 0.0)*100:.1f}%")
                         with exp_quality_cols[1]:
                             st.metric("Project Expertise", f"{metrics.get('project_expertise', 0.0)*100:.1f}%")
                         with exp_quality_cols[2]:
                             st.metric("Overall Technical Fit", f"{metrics.get('overall_technical_fit', 0.0)*100:.1f}%")
 
-                        # Implementation Experience
-                        if technical_assessment.get('implementation_experience'):
-                            st.write("#### Implementation Experience")
-                            for exp in technical_assessment['implementation_experience']:
+                        # Experience Details
+                        if exp_data.get('details'):
+                            st.write("**Experience Analysis:**")
+                            st.write(exp_data['details'])
+
+                        # Technical Implementation Experience
+                        tech_assessment = details['evaluation_data'].get('technical_assessment', {})
+                        if tech_assessment.get('implementation_experience'):
+                            st.write("**Implementation Experience:**")
+                            for exp in tech_assessment['implementation_experience']:
                                 st.write(f"• {exp}")
+
 
                         # Project Experience
                         if details['key_matches'].get('projects'):

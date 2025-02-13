@@ -19,7 +19,7 @@ class AIEvaluator:
         """Extract candidate's personal information from resume using GPT-4."""
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",  # Using GPT-4 Turbo for better extraction
+                model="gpt-4-turbo-preview",
                 messages=[
                     {
                         "role": "system",
@@ -40,7 +40,7 @@ class AIEvaluator:
                         "content": resume_text
                     }
                 ],
-                temperature=0.1  # Lower temperature for more consistent extraction
+                temperature=0.1
             )
 
             content = response.choices[0].message.content.strip()
@@ -55,18 +55,38 @@ class AIEvaluator:
             candidate_info = self.extract_candidate_info(resume_text)
 
             # Build dynamic system message based on evaluation criteria
-            system_message = """You are an expert technical recruiter with these priorities:
-            1. Focus on practical implementation experience and technical depth over years of experience
-            2. Value quality of projects and technical contributions over duration
-            3. Consider transferable skills and adaptability
-            4. Look for evidence of hands-on implementation experience
+            system_message = """You are an expert technical recruiter for SAP and IT Services positions with these strict evaluation criteria:
 
-            Analyze the resume against the job description and return your evaluation EXACTLY as a JSON object 
-            with the following structure:
+            1. Experience Requirements:
+               - Total experience must be within ±20% of the required years
+               - Relevant SAP implementation experience is mandatory
+               - IT services company experience is heavily weighted
+               - SAP Public Cloud experience is a significant advantage
+
+            2. Technical Experience Focus:
+               - Direct hands-on SAP implementation experience
+               - Project complexity and scale in IT services context
+               - Experience with SAP Public Cloud solutions
+               - Client-facing implementation roles
+
+            3. Decision Criteria (ALL must be met for shortlisting):
+               - Experience matches within ±20% of requirement
+               - Has direct SAP implementation experience
+               - Has worked in IT services company
+               - Shows evidence of client-facing roles
+               - Demonstrates project delivery experience
+
+            4. Automatic Rejection Criteria:
+               - Experience outside ±20% range
+               - No SAP implementation experience
+               - No IT services company experience
+               - Lack of client-facing experience
+
+            Analyze the resume against the job description and return your evaluation EXACTLY as a JSON object with this structure:
             {
                 "decision": "shortlist" or "reject",
                 "confidence_score": float between 0 and 1,
-                "justification": "detailed explanation focusing on technical capabilities",
+                "justification": "detailed explanation focusing on technical capabilities and experience match",
                 "match_score": float between 0 and 1,
                 "years_of_experience": {
                     "total": float,
@@ -74,60 +94,42 @@ class AIEvaluator:
                     "required": float,
                     "meets_requirement": boolean,
                     "quality_score": float between 0 and 1,
-                    "details": "analysis focusing on quality of experience over duration"
+                    "details": "analysis focusing on quality and relevance of experience"
                 },
-                "technical_assessment": {
-                    "implementation_experience": ["specific examples of hands-on implementation"],
-                    "technical_depth": float between 0 and 1,
-                    "problem_solving": float between 0 and 1,
-                    "project_complexity": float between 0 and 1
+                "sap_experience": {
+                    "implementation_experience": boolean,
+                    "public_cloud_experience": boolean,
+                    "years_in_sap": float,
+                    "expertise_areas": ["list of SAP expertise areas"]
+                },
+                "it_services_experience": {
+                    "has_experience": boolean,
+                    "years": float,
+                    "companies": ["list of IT services companies"],
+                    "client_facing_roles": boolean
                 },
                 "key_matches": {
-                    "skills": ["list of matching technical skills"],
-                    "projects": ["relevant project experiences"],
-                    "implementations": ["specific implementation examples"],
-                    "certifications": ["relevant certifications"]
+                    "skills": ["relevant technical skills"],
+                    "projects": ["relevant SAP implementation projects"],
+                    "implementations": ["specific implementation examples"]
                 },
                 "missing_requirements": {
-                    "critical": ["list of critical missing technical requirements"],
-                    "preferred": ["list of preferred but missing requirements"]
-                },
-                "recommendations": {
-                    "interview_focus": ["specific technical areas to focus on during interview"],
-                    "skill_gaps": ["recommended areas for technical development"],
-                    "project_suggestions": ["suggested project types to gain experience"]
-                },
-                "evaluation_metrics": {
-                    "technical_skills": float between 0 and 1,
-                    "implementation_experience": float between 0 and 1,
-                    "project_expertise": float between 0 and 1,
-                    "problem_solving": float between 0 and 1,
-                    "overall_technical_fit": float between 0 and 1
+                    "critical": ["critical missing requirements"],
+                    "preferred": ["preferred but missing requirements"]
                 }
             }
-            Only return the JSON object, nothing else.
-
-            Important Guidelines:
-            1. Prioritize hands-on implementation experience over years of experience
-            2. Look for evidence of completed projects and technical depth
-            3. Consider transferable skills from different technologies
-            4. Value problem-solving ability and technical adaptability
-            5. Don't reject solely based on years of experience if technical skills are strong"""
+            Only return the JSON object, nothing else."""
 
             if evaluation_criteria:
-                system_message += "\n\nEvaluation Adjustments:"
+                system_message += "\n\nAdditional Evaluation Adjustments:"
                 if evaluation_criteria.get('min_years_experience'):
-                    system_message += f"\n- Treat {evaluation_criteria['min_years_experience']} years as a flexible guideline, not a hard requirement"
-                    system_message += "\n- Focus more on the quality and depth of experience rather than duration"
+                    required_years = evaluation_criteria['min_years_experience']
+                    system_message += f"\n- Required Years: {required_years}"
+                    system_message += f"\n- Acceptable Range: {required_years * 0.8} to {required_years * 1.2} years"
 
                 if evaluation_criteria.get('required_skills'):
-                    system_message += "\n- Required Technical Skills (prioritize implementation experience):"
+                    system_message += "\n- Required Technical Skills:"
                     for skill in evaluation_criteria['required_skills']:
-                        system_message += f"\n  * {skill}"
-
-                if evaluation_criteria.get('preferred_skills'):
-                    system_message += "\n- Preferred Technical Skills:"
-                    for skill in evaluation_criteria['preferred_skills']:
                         system_message += f"\n  * {skill}"
 
             # Evaluation with GPT-4 Turbo
@@ -154,8 +156,8 @@ class AIEvaluator:
 
             # Validate response format
             required_keys = [
-                'decision', 'justification', 'match_score', 'technical_assessment',
-                'key_matches', 'missing_requirements', 'evaluation_metrics'
+                'decision', 'justification', 'match_score', 'years_of_experience',
+                'sap_experience', 'it_services_experience', 'key_matches', 'missing_requirements'
             ]
             if not all(key in result for key in required_keys):
                 raise ValueError("Invalid response format from OpenAI API")
@@ -175,23 +177,21 @@ class AIEvaluator:
                 messages=[
                     {
                         "role": "system",
-                        "content": """As an expert HR consultant, analyze the resume against the job requirements 
-                        and provide actionable improvement suggestions. Format your response EXACTLY as a JSON object 
-                        with this structure:
+                        "content": """As an expert HR consultant specializing in SAP and IT Services positions, 
+                        analyze the resume against the job requirements and provide actionable improvement suggestions. 
+                        Format your response EXACTLY as a JSON object with this structure:
                         {
-                            "skill_improvements": {
-                                "technical": ["specific technical skills to develop"],
-                                "soft": ["specific soft skills to enhance"]
+                            "experience_gaps": {
+                                "sap": ["specific SAP experience gaps"],
+                                "it_services": ["IT services experience gaps"],
+                                "implementation": ["implementation experience gaps"]
                             },
-                            "experience_suggestions": {
-                                "roles": ["specific roles or positions to target"],
-                                "projects": ["types of projects to undertake"]
-                            },
-                            "certification_recommendations": ["specific certifications that would add value"],
+                            "skill_improvements": ["specific technical skills to develop"],
+                            "certification_recommendations": ["relevant SAP certifications"],
                             "resume_presentation": {
                                 "format": ["formatting improvements"],
                                 "content": ["content enhancement suggestions"],
-                                "keywords": ["important keywords to include"]
+                                "keywords": ["important SAP and IT services keywords to include"]
                             }
                         }
                         Only return the JSON object, nothing else."""

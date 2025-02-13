@@ -297,30 +297,32 @@ def show_evaluation():
                     st.success("Evaluation Complete!")
 
                     # Decision with color coding
-                    if evaluation['decision'] == 'shortlist':
-                        st.success(f"Decision: {evaluation['decision'].upper()}")
+                    result = evaluation.get('decision', '').upper()
+                    if result == 'SHORTLIST':
+                        st.success(f"Decision: {result}")
                     else:
-                        st.error(f"Decision: {evaluation['decision'].upper()}")
+                        st.error(f"Decision: {result}")
 
                     # Match score with progress bar
                     st.subheader("Match Score")
-                    st.progress(float(evaluation['match_score']))
-                    st.write(f"Match Score: {evaluation['match_score']*100:.1f}%")
+                    match_score = float(evaluation.get('match_score', 0))
+                    st.progress(match_score)
+                    st.write(f"Match Score: {match_score*100:.1f}%")
 
                     # Experience Analysis
                     st.subheader("Experience Analysis")
-                    exp_data = evaluation['years_of_experience']
+                    exp_data = evaluation.get('years_of_experience', {})
                     cols = st.columns(3)
                     with cols[0]:
-                        st.metric("Total Experience", f"{exp_data['total']} years")
+                        st.metric("Total Experience", f"{exp_data.get('total', 0)} years")
                     with cols[1]:
-                        st.metric("Relevant Experience", f"{exp_data['relevant']} years")
+                        st.metric("Relevant Experience", f"{exp_data.get('relevant', 0)} years")
                     with cols[2]:
-                        st.metric("Required Experience", f"{exp_data['required']} years")
+                        st.metric("Required Experience", f"{exp_data.get('required', 0)} years")
 
                     # Detailed justification
                     st.subheader("Evaluation Details")
-                    st.write("**Justification:**", evaluation['justification'])
+                    st.write("**Justification:**", evaluation.get('justification', ''))
 
                     if 'experience_analysis' in evaluation:
                         st.write("**Experience Analysis:**", evaluation['experience_analysis'])
@@ -329,14 +331,13 @@ def show_evaluation():
                     col1, col2 = st.columns(2)
                     with col1:
                         st.write("**Matching Skills/Qualifications:**")
-                        for skill in evaluation['key_matches']:
+                        for skill in evaluation.get('key_matches', []):
                             st.write("✓", skill)
 
                     with col2:
                         st.write("**Missing Requirements:**")
-                        for req in evaluation['missing_requirements']:
+                        for req in evaluation.get('missing_requirements', []):
                             st.write("✗", req)
-                    st.session_state.evaluation_complete = True
 
     with tab2:
         st.subheader("Evaluations")
@@ -400,41 +401,30 @@ def show_evaluation():
                     'candidate_email': eval_record[4],
                     'candidate_phone': eval_record[5],
                     'job_title': eval_record[15],
-                    'result': eval_record[6],
-                    'match_score': eval_record[8],
+                    'result': str(eval_record[6]),  # Ensure result is a string
+                    'match_score': float(eval_record[8]) if eval_record[8] is not None else 0.0,  # Ensure match_score is a float
                     'evaluation_date': eval_record[13]
                 }
 
-                # Apply search filter (now includes candidate name)
-                if (search_term.lower() not in (eval_data['candidate_name'] or '').lower() and
-                    search_term.lower() not in eval_data['job_title'].lower()):
+                # Apply search filter
+                if search_term.lower() not in eval_data['resume_name'].lower() and \
+                   search_term.lower() not in eval_data['job_title'].lower() and \
+                   search_term.lower() not in (eval_data['candidate_name'] or '').lower():
                     continue
 
-                # Create card for each evaluation with candidate info
-                candidate_display = eval_data['candidate_name'] or eval_data['resume_name']
-                with st.expander(f"📄 Candidate: {candidate_display} | Position: {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
+                # Create card for each evaluation
+                with st.expander(f"📄 {eval_data['resume_name']} - {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
                     cols = st.columns([2, 1, 1])
 
-                    # Contact information section
-                    if eval_data['candidate_email'] or eval_data['candidate_phone']:
-                        st.write("#### Contact Information")
-                        contact_cols = st.columns(2)
-                        with contact_cols[0]:
-                            if eval_data['candidate_email']:
-                                st.write(f"📧 Email: {eval_data['candidate_email']}")
-                        with contact_cols[1]:
-                            if eval_data['candidate_phone']:
-                                st.write(f"📱 Phone: {eval_data['candidate_phone']}")
-                        st.markdown("---")
-
                     with cols[0]:
-                        if eval_data['result'] == 'shortlist':
-                            st.success(f"Decision: {eval_data['result'].upper()}")
+                        result = eval_data['result'].upper()
+                        if result == 'SHORTLIST':
+                            st.success(f"Decision: {result}")
                         else:
-                            st.error(f"Decision: {eval_data['result'].upper()}")
+                            st.error(f"Decision: {result}")
 
                     with cols[1]:
-                        st.metric("Match Score", f"{float(eval_data['match_score'])*100:.1f}%")
+                        st.metric("Match Score", f"{eval_data['match_score']*100:.1f}%")
 
                     # Get detailed evaluation data
                     details = st.session_state.components['db'].get_evaluation_details(eval_data['id'])
@@ -475,11 +465,8 @@ def show_evaluation():
                                 mime="application/json"
                             )
 
-                        with dl_cols[1]:
-                            st.write("Resume download option will be added here")
-
             except Exception as e:
-                st.error(f"Error displaying evaluation: {str(e)}")
+                logger.error(f"Error displaying evaluation: {str(e)}")
                 continue
 
 def show_analytics():

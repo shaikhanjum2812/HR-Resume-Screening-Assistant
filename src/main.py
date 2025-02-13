@@ -9,31 +9,36 @@ from pdf_processor import PDFProcessor
 from analytics import Analytics
 from utils import extract_text_from_upload
 
-# Initialize components with debug logging
-st.write("Initializing components...")
+def initialize_components():
+    """Initialize all required components with proper error handling"""
+    components = {}
 
-try:
-    db = Database()
-    st.write("Database connection established")
-except Exception as e:
-    st.error(f"Failed to connect to database: {str(e)}")
+    try:
+        components['db'] = Database()
+    except Exception as e:
+        st.error(f"Failed to connect to database: {str(e)}")
+        return None
 
-try:
-    ai_evaluator = AIEvaluator()
-    st.write("AI Evaluator initialized")
-except Exception as e:
-    st.error(f"Failed to initialize AI Evaluator: {str(e)}")
+    try:
+        components['ai_evaluator'] = AIEvaluator()
+    except Exception as e:
+        st.error(f"Failed to initialize AI Evaluator: {str(e)}")
+        return None
 
-try:
-    pdf_processor = PDFProcessor()
-    analytics = Analytics()
-    st.write("PDF Processor and Analytics initialized")
-except Exception as e:
-    st.error(f"Failed to initialize other components: {str(e)}")
+    try:
+        components['pdf_processor'] = PDFProcessor()
+        components['analytics'] = Analytics()
+    except Exception as e:
+        st.error(f"Failed to initialize other components: {str(e)}")
+        return None
+
+    return components
 
 def init_session_state():
     if 'page' not in st.session_state:
         st.session_state.page = 'home'
+    if 'components' not in st.session_state:
+        st.session_state.components = None
 
 def sidebar():
     st.sidebar.title("HR Assistant")
@@ -51,11 +56,17 @@ def show_home():
     st.title("HR Assistant Dashboard")
     st.write("Welcome to the HR Assistant tool. Use the sidebar to navigate.")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Active Job Descriptions", db.get_active_jobs_count())
-    with col2:
-        st.metric("Evaluations Today", db.get_today_evaluations_count())
+    try:
+        db = st.session_state.components['db']
+        col1, col2 = st.columns(2)
+        with col1:
+            active_jobs = db.get_active_jobs_count()
+            st.metric("Active Job Descriptions", active_jobs)
+        with col2:
+            today_evals = db.get_today_evaluations_count()
+            st.metric("Evaluations Today", today_evals)
+    except Exception as e:
+        st.error(f"Error loading dashboard metrics: {str(e)}")
 
 def show_jobs():
     st.title("Job Descriptions Management")
@@ -115,7 +126,7 @@ def show_jobs():
                         'additional_instructions': additional_instructions
                     }
 
-                    db.add_job_description(title, description, evaluation_criteria)
+                    st.session_state.components['db'].add_job_description(title, description, evaluation_criteria)
                     st.success("Job description and evaluation criteria saved successfully!")
                 except Exception as e:
                     st.error(f"Failed to save job description: {str(e)}")
@@ -178,7 +189,7 @@ def show_jobs():
                             'additional_instructions': additional_instructions
                         }
 
-                        db.add_job_description(title, description, evaluation_criteria)
+                        st.session_state.components['db'].add_job_description(title, description, evaluation_criteria)
                         st.success("Job description uploaded and criteria saved successfully!")
                         st.subheader("Extracted Text Preview")
                         st.text_area("Preview", description, height=200, disabled=True)
@@ -190,14 +201,14 @@ def show_jobs():
     # List existing job descriptions
     st.markdown("---")
     st.subheader("Existing Job Descriptions")
-    jobs = db.get_all_jobs()
+    jobs = st.session_state.components['db'].get_all_jobs()
     for job in jobs:
         with st.expander(f"{job['title']} - {job['date_created']}"):
             st.write(job['description'])
 
             # Show evaluation criteria if exists
             if job['has_criteria']:
-                criteria = db.get_evaluation_criteria(job['id'])
+                criteria = st.session_state.components['db'].get_evaluation_criteria(job['id'])
                 if criteria:
                     st.subheader("Evaluation Criteria")
                     col1, col2 = st.columns(2)
@@ -222,7 +233,7 @@ def show_jobs():
                     st.write(criteria['additional_instructions'])
 
             if st.button(f"Delete {job['title']}", key=f"del_{job['id']}"):
-                db.delete_job(job['id'])
+                st.session_state.components['db'].delete_job(job['id'])
                 st.rerun()
 
 def show_evaluation():
@@ -233,7 +244,7 @@ def show_evaluation():
 
     with tab1:
         # Job selection
-        jobs = db.get_all_jobs()
+        jobs = st.session_state.components['db'].get_all_jobs()
         job_titles = [job['title'] for job in jobs]
         selected_job = st.selectbox("Select Job Description", job_titles)
 
@@ -244,21 +255,21 @@ def show_evaluation():
             if st.button("Evaluate Resume"):
                 with st.spinner("Processing resume..."):
                     # Extract text from PDF
-                    resume_text = pdf_processor.extract_text(uploaded_file)
+                    resume_text = st.session_state.components['pdf_processor'].extract_text(uploaded_file)
 
                     # Get job description and criteria
                     job = next(job for job in jobs if job['title'] == selected_job)
-                    criteria = db.get_evaluation_criteria(job['id']) if job['has_criteria'] else None
+                    criteria = st.session_state.components['db'].get_evaluation_criteria(job['id']) if job['has_criteria'] else None
 
                     # Evaluate with AI
-                    evaluation = ai_evaluator.evaluate_resume(
+                    evaluation = st.session_state.components['ai_evaluator'].evaluate_resume(
                         resume_text,
                         job['description'],
                         evaluation_criteria=criteria
                     )
 
                     # Save complete evaluation results
-                    db.save_evaluation(
+                    st.session_state.components['db'].save_evaluation(
                         job_id=job['id'],
                         resume_name=uploaded_file.name,
                         evaluation_result=evaluation
@@ -340,7 +351,7 @@ def show_evaluation():
                 if start_date > end_date:
                     st.error("Start date must be before end date")
                     return
-            evaluations = db.get_evaluations_by_date_range(start_date, end_date)
+            evaluations = st.session_state.components['db'].get_evaluations_by_date_range(start_date, end_date)
         else:
             # Convert period to database format
             period_map = {
@@ -348,7 +359,7 @@ def show_evaluation():
                 "Past Month": "month",
                 "Past Quarter": "quarter"
             }
-            evaluations = db.get_evaluations_by_period(period_map[period])
+            evaluations = st.session_state.components['db'].get_evaluations_by_period(period_map[period])
 
         if not evaluations:
             st.info("No evaluations found for the selected period.")
@@ -408,7 +419,7 @@ def show_evaluation():
                         st.metric("Match Score", f"{float(eval_data['match_score'])*100:.1f}%")
 
                     # Get detailed evaluation data
-                    details = db.get_evaluation_details(eval_data['id'])
+                    details = st.session_state.components['db'].get_evaluation_details(eval_data['id'])
                     if details:
                         st.write("#### Key Information")
                         exp_cols = st.columns(3)
@@ -461,7 +472,7 @@ def show_analytics():
     period = st.selectbox("Select Time Period", ["Week", "Month", "Year"])
 
     # Get analytics data
-    data = analytics.get_evaluation_stats(period.lower())
+    data = st.session_state.components['analytics'].get_evaluation_stats(period.lower())
 
     # Display metrics
     col1, col2, col3 = st.columns(3)
@@ -474,13 +485,27 @@ def show_analytics():
 
     # Display charts
     st.subheader("Evaluation Trends")
-    st.plotly_chart(analytics.plot_evaluation_trend(period.lower()))
+    st.plotly_chart(st.session_state.components['analytics'].plot_evaluation_trend(period.lower()))
 
     st.subheader("Job-wise Distribution")
-    st.plotly_chart(analytics.plot_job_distribution())
+    st.plotly_chart(st.session_state.components['analytics'].plot_job_distribution())
 
 def main():
+    st.set_page_config(
+        page_title="HR Assistant",
+        page_icon="👥",
+        layout="wide"
+    )
+
     init_session_state()
+
+    if st.session_state.components is None:
+        st.session_state.components = initialize_components()
+
+    if st.session_state.components is None:
+        st.error("Failed to initialize application components. Please refresh the page or contact support.")
+        return
+
     sidebar()
 
     if st.session_state.page == 'home':

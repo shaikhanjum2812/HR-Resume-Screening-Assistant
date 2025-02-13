@@ -3,71 +3,79 @@ from datetime import datetime
 import json
 import psycopg2
 from psycopg2.extras import DictCursor
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Database:
     def __init__(self):
-        self.conn = psycopg2.connect(os.environ['DATABASE_URL'])
-        self.create_tables()
+        try:
+            self.conn = psycopg2.connect(os.environ['DATABASE_URL'])
+            self.create_tables()
+            logger.info("Database connection and tables initialized successfully")
+        except Exception as e:
+            logger.error(f"Database initialization error: {e}")
+            raise
 
     def create_tables(self):
         cursor = self.conn.cursor()
+        try:
+            # Job Descriptions table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS job_descriptions (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                active BOOLEAN DEFAULT TRUE
+            )
+            ''')
 
-        # Job Descriptions table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS job_descriptions (
-            id SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            description TEXT NOT NULL,
-            date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            active BOOLEAN DEFAULT TRUE
-        )
-        ''')
+            # Evaluation Criteria table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS evaluation_criteria (
+                id SERIAL PRIMARY KEY,
+                job_id INTEGER REFERENCES job_descriptions(id),
+                min_years_experience INTEGER,
+                required_skills TEXT,
+                preferred_skills TEXT,
+                education_requirements TEXT,
+                company_background_requirements TEXT,
+                domain_experience_requirements TEXT,
+                additional_instructions TEXT
+            )
+            ''')
 
-        # Evaluation Criteria table
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS evaluation_criteria (
-            id SERIAL PRIMARY KEY,
-            job_id INTEGER REFERENCES job_descriptions(id),
-            min_years_experience INTEGER,
-            required_skills TEXT,
-            preferred_skills TEXT,
-            education_requirements TEXT,
-            company_background_requirements TEXT,
-            domain_experience_requirements TEXT,
-            additional_instructions TEXT
-        )
-        ''')
+            # Evaluations table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS evaluations (
+                id SERIAL PRIMARY KEY,
+                job_id INTEGER REFERENCES job_descriptions(id),
+                resume_name TEXT NOT NULL,
+                candidate_name TEXT,
+                candidate_email TEXT,
+                candidate_phone TEXT,
+                result TEXT NOT NULL,
+                justification TEXT NOT NULL,
+                match_score FLOAT,
+                years_experience_total FLOAT,
+                years_experience_relevant FLOAT,
+                years_experience_required FLOAT,
+                meets_experience_requirement BOOLEAN,
+                key_matches TEXT,
+                missing_requirements TEXT,
+                experience_analysis TEXT,
+                evaluation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                evaluation_data TEXT
+            )
+            ''')
 
-        # Drop the evaluations table if it exists
-        cursor.execute('''
-            DROP TABLE IF EXISTS evaluations;
-        ''')
-
-        # Recreate the Evaluations table with candidate information
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS evaluations (
-            id SERIAL PRIMARY KEY,
-            job_id INTEGER REFERENCES job_descriptions(id),
-            resume_name TEXT NOT NULL,
-            candidate_name TEXT,
-            candidate_email TEXT,
-            candidate_phone TEXT,
-            result TEXT NOT NULL,
-            justification TEXT NOT NULL,
-            match_score FLOAT,
-            years_experience_total FLOAT,
-            years_experience_relevant FLOAT,
-            years_experience_required FLOAT,
-            meets_experience_requirement BOOLEAN,
-            key_matches TEXT,
-            missing_requirements TEXT,
-            experience_analysis TEXT,
-            evaluation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            evaluation_data TEXT
-        )
-        ''')
-
-        self.conn.commit()
+            self.conn.commit()
+            logger.info("Database tables created successfully")
+        except Exception as e:
+            self.conn.rollback()
+            logger.error(f"Error creating tables: {e}")
+            raise
 
     def clear_evaluations(self):
         """Safely remove all evaluation records while keeping the table structure."""
@@ -217,16 +225,26 @@ class Database:
 
     def get_active_jobs_count(self):
         cursor = self.conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM job_descriptions WHERE active = true')
-        return cursor.fetchone()[0]
+        try:
+            cursor.execute('SELECT COUNT(*) FROM job_descriptions WHERE active = true')
+            result = cursor.fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            logger.error(f"Error getting active jobs count: {e}")
+            return 0
 
     def get_today_evaluations_count(self):
         cursor = self.conn.cursor()
-        cursor.execute('''
-            SELECT COUNT(*) FROM evaluations 
-            WHERE DATE(evaluation_date) = CURRENT_DATE
-        ''')
-        return cursor.fetchone()[0]
+        try:
+            cursor.execute('''
+                SELECT COUNT(*) FROM evaluations 
+                WHERE DATE(evaluation_date) = CURRENT_DATE
+            ''')
+            result = cursor.fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            logger.error(f"Error getting today's evaluations count: {e}")
+            return 0
 
     def get_evaluation_criteria(self, job_id):
         cursor = self.conn.cursor()

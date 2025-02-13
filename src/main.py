@@ -1,7 +1,9 @@
+import os
+import sys
+import logging
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import os
 import json
 from database import Database
 from ai_evaluator import AIEvaluator
@@ -9,29 +11,45 @@ from pdf_processor import PDFProcessor
 from analytics import Analytics
 from utils import extract_text_from_upload
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 def initialize_components():
     """Initialize all required components with proper error handling"""
     components = {}
 
+    logger.info("Starting component initialization...")
+
     try:
+        logger.info("Initializing database connection...")
         components['db'] = Database()
+        logger.info("Database connection successful")
     except Exception as e:
+        logger.error(f"Failed to connect to database: {str(e)}")
         st.error(f"Failed to connect to database: {str(e)}")
         return None
 
     try:
+        logger.info("Initializing AI Evaluator...")
         components['ai_evaluator'] = AIEvaluator()
+        logger.info("AI Evaluator initialization successful")
     except Exception as e:
+        logger.error(f"Failed to initialize AI Evaluator: {str(e)}")
         st.error(f"Failed to initialize AI Evaluator: {str(e)}")
         return None
 
     try:
+        logger.info("Initializing PDF Processor and Analytics...")
         components['pdf_processor'] = PDFProcessor()
         components['analytics'] = Analytics()
+        logger.info("PDF Processor and Analytics initialization successful")
     except Exception as e:
+        logger.error(f"Failed to initialize other components: {str(e)}")
         st.error(f"Failed to initialize other components: {str(e)}")
         return None
 
+    logger.info("All components initialized successfully")
     return components
 
 def init_session_state():
@@ -464,7 +482,6 @@ def show_evaluation():
                 st.error(f"Error displaying evaluation: {str(e)}")
                 continue
 
-
 def show_analytics():
     st.title("Analytics Dashboard")
 
@@ -491,31 +508,44 @@ def show_analytics():
     st.plotly_chart(st.session_state.components['analytics'].plot_job_distribution())
 
 def main():
-    st.set_page_config(
-        page_title="HR Assistant",
-        page_icon="👥",
-        layout="wide"
-    )
+    logger.info("Starting HR Assistant application...")
 
-    init_session_state()
+    try:
+        st.set_page_config(
+            page_title="HR Assistant",
+            page_icon="👥",
+            layout="wide"
+        )
+        logger.info("Page configuration set successfully")
 
-    if st.session_state.components is None:
-        st.session_state.components = initialize_components()
+        init_session_state()
+        logger.info("Session state initialized")
 
-    if st.session_state.components is None:
-        st.error("Failed to initialize application components. Please refresh the page or contact support.")
-        return
+        if st.session_state.components is None:
+            logger.info("Initializing components...")
+            st.session_state.components = initialize_components()
 
-    sidebar()
+        if st.session_state.components is None:
+            logger.error("Failed to initialize application components")
+            st.error("Failed to initialize application components. Please refresh the page or contact support.")
+            return
 
-    if st.session_state.page == 'home':
-        show_home()
-    elif st.session_state.page == 'jobs':
-        show_jobs()
-    elif st.session_state.page == 'evaluation':
-        show_evaluation()
-    elif st.session_state.page == 'analytics':
-        show_analytics()
+        sidebar()
+
+        if st.session_state.page == 'home':
+            show_home()
+        elif st.session_state.page == 'jobs':
+            show_jobs()
+        elif st.session_state.page == 'evaluation':
+            show_evaluation()
+        elif st.session_state.page == 'analytics':
+            show_analytics()
+
+        logger.info(f"Page {st.session_state.page} rendered successfully")
+
+    except Exception as e:
+        logger.error(f"Main application error: {str(e)}")
+        st.error(f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
     main()

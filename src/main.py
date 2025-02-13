@@ -235,7 +235,7 @@ def show_evaluation():
 
                     # Evaluate with AI
                     evaluation = ai_evaluator.evaluate_resume(
-                        resume_text, 
+                        resume_text,
                         job['description'],
                         evaluation_criteria=criteria
                     )
@@ -328,35 +328,38 @@ def show_evaluation():
                 ):
                     # Retrieve full evaluation details
                     details = db.get_evaluation_details(row['ID'])
+                    if details:  # Add null check
+                        # Display detailed information
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("Match Score", row['Match Score'])
+                            st.write("**Decision:**", details['result'].upper())
+                            st.write("**Total Experience:**", f"{details['years_experience_total']} years")
+                            st.write("**Relevant Experience:**", f"{details['years_experience_relevant']} years")
 
-                    # Display detailed information
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Match Score", row['Match Score'])
-                        st.write("**Decision:**", details['result'].upper())
-                        st.write("**Total Experience:**", f"{details['years_experience_total']} years")
-                        st.write("**Relevant Experience:**", f"{details['years_experience_relevant']} years")
+                        with col2:
+                            if details['meets_experience_requirement']:
+                                st.success("✓ Meets Experience Requirement")
+                            else:
+                                st.error("✗ Does Not Meet Experience Requirement")
+                            st.write("**Required Experience:**", f"{details['years_experience_required']} years")
 
-                    with col2:
-                        if details['meets_experience_requirement']:
-                            st.success("✓ Meets Experience Requirement")
-                        else:
-                            st.error("✗ Does Not Meet Experience Requirement")
-                        st.write("**Required Experience:**", f"{details['years_experience_required']} years")
+                        st.write("**Justification:**", details['justification'])
+                        st.write("**Experience Analysis:**", details['experience_analysis'])
 
-                    st.write("**Justification:**", details['justification'])
-                    st.write("**Experience Analysis:**", details['experience_analysis'])
+                        col3, col4 = st.columns(2)
+                        with col3:
+                            st.write("**Matching Skills:**")
+                            for skill in details['key_matches']:
+                                st.write("✓", skill)
 
-                    col3, col4 = st.columns(2)
-                    with col3:
-                        st.write("**Matching Skills:**")
-                        for skill in details['key_matches']:
-                            st.write("✓", skill)
+                        with col4:
+                            st.write("**Missing Requirements:**")
+                            for req in details['missing_requirements']:
+                                st.write("✗", req)
+                    else:
+                        st.warning("Detailed evaluation data not available for this record.")
 
-                    with col4:
-                        st.write("**Missing Requirements:**")
-                        for req in details['missing_requirements']:
-                            st.write("✗", req)
 
 def show_analytics():
     st.title("Analytics Dashboard")

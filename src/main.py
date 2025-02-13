@@ -488,84 +488,11 @@ def show_evaluation():
 
                         st.markdown("---")  # Add a separator line
 
-                        # Overall Decision and Scores
-                        st.write("#### Overall Assessment")
-                        metrics_cols = st.columns(4)
-                        with metrics_cols[0]:
-                            if decision == 'SHORTLIST':
-                                st.success(f"Decision: {decision}")
-                            else:
-                                st.error(f"Decision: {decision}")
-                        with metrics_cols[1]:
-                            st.metric("Match Score", f"{eval_data['match_score']*100:.1f}%")
-                        with metrics_cols[2]:
-                            confidence = details['evaluation_data'].get('confidence_score', 0.0)
-                            st.metric("Confidence", f"{confidence*100:.1f}%")
-                        with metrics_cols[3]:
-                            overall_fit = details['evaluation_data'].get('evaluation_metrics', {}).get('overall_fit', 0.0)
-                            st.metric("Overall Fit", f"{overall_fit*100:.1f}%")
-
-                        # Detailed Metrics
-                        st.write("#### Evaluation Metrics")
-                        metric_cols = st.columns(4)
-                        metrics = details['evaluation_data'].get('evaluation_metrics', {})
-                        with metric_cols[0]:
-                            st.metric("Technical Skills", f"{metrics.get('technical_skills', 0.0)*100:.1f}%")
-                        with metric_cols[1]:
-                            st.metric("Experience Relevance", f"{metrics.get('experience_relevance', 0.0)*100:.1f}%")
-                        with metric_cols[2]:
-                            st.metric("Education Match", f"{metrics.get('education_match', 0.0)*100:.1f}%")
-                        with metric_cols[3]:
-                            st.metric("Overall Fit", f"{metrics.get('overall_fit', 0.0)*100:.1f}%")
-
-                        # Technical Assessment Section
-                        st.write("#### Technical Capability Assessment")
-                        tech_cols = st.columns(4)
-                        technical_assessment = details['evaluation_data'].get('technical_assessment', {})
-                        with tech_cols[0]:
-                            st.metric("Technical Depth", f"{technical_assessment.get('technical_depth', 0.0)*100:.1f}%")
-                        with tech_cols[1]:
-                            st.metric("Problem Solving", f"{technical_assessment.get('problem_solving', 0.0)*100:.1f}%")
-                        with tech_cols[2]:
-                            st.metric("Project Complexity", f"{technical_assessment.get('project_complexity', 0.0)*100:.1f}%")
-                        with tech_cols[3]:
-                            st.metric("Implementation Expertise", f"{metrics.get('implementation_experience', 0.0)*100:.1f}%")
-
-                        # Experience Quality Section
+                        # Experience Assessment Section
                         st.write("#### Experience Assessment")
-                        exp_quality_cols = st.columns(3)
-                        exp_data = details['evaluation_data'].get('years_of_experience', {})
-                        metrics = details['evaluation_data'].get('evaluation_metrics', {})
-
-                        with exp_quality_cols[0]:
-                            st.metric("Experience Quality", f"{exp_data.get('quality_score', 0.0)*100:.1f}%")
-                        with exp_quality_cols[1]:
-                            st.metric("Project Expertise", f"{metrics.get('project_expertise', 0.0)*100:.1f}%")
-                        with exp_quality_cols[2]:
-                            st.metric("Overall Technical Fit", f"{metrics.get('overall_technical_fit', 0.0)*100:.1f}%")
-
-                        # Experience Details
-                        if exp_data.get('details'):
-                            st.write("**Experience Analysis:**")
-                            st.write(exp_data['details'])
-
-                        # Technical Implementation Experience
-                        tech_assessment = details['evaluation_data'].get('technical_assessment', {})
-                        if tech_assessment.get('implementation_experience'):
-                            st.write("**Implementation Experience:**")
-                            for exp in tech_assessment['implementation_experience']:
-                                st.write(f"• {exp}")
-
-
-                        # Project Experience
-                        if details['key_matches'].get('projects'):
-                            st.write("#### Relevant Projects")
-                            for project in details['key_matches']['projects']:
-                                st.write(f"• {project}")
-
-                        # Experience Analysis
-                        st.write("#### Experience Analysis")
                         exp_cols = st.columns(3)
+                        exp_data = details['evaluation_data'].get('years_of_experience', {})
+
                         with exp_cols[0]:
                             st.metric("Total Experience", f"{details['years_experience_total']} years")
                         with exp_cols[1]:
@@ -573,7 +500,18 @@ def show_evaluation():
                         with exp_cols[2]:
                             st.metric("Required Experience", f"{details['years_experience_required']} years")
 
-                        # Justification
+                        # Experience Analysis Section
+                        st.write("#### Experience Analysis")
+                        if exp_data.get('details'):
+                            st.write(exp_data['details'])
+
+                        # Relevant Projects
+                        if details['key_matches'].get('projects'):
+                            st.write("#### Relevant Projects")
+                            for project in details['key_matches']['projects']:
+                                st.write(f"• {project}")
+
+                        # Evaluation Summary
                         st.write("#### Evaluation Summary")
                         st.write(details['justification'])
 

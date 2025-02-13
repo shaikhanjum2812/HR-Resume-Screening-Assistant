@@ -378,9 +378,13 @@ def show_evaluation():
 
         # Handle row selection
         if selected_indices is not None and len(selected_indices) > 0:
-            selected_row = df.iloc[selected_indices[0]]
-            st.session_state.show_justification = True
-            st.session_state.selected_eval = selected_row['ID']
+            try:
+                selected_row = df.iloc[list(selected_indices)[0]]
+                st.session_state.show_justification = True
+                st.session_state.selected_eval = selected_row['ID']
+            except Exception as e:
+                st.error(f"Error selecting row: {str(e)}")
+                return
 
         # Show modal with justification
         if st.session_state.show_justification and st.session_state.selected_eval:

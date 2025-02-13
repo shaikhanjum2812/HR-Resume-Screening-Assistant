@@ -142,15 +142,50 @@ def show_evaluation():
                 else:
                     st.error(f"Decision: {evaluation['decision'].upper()}")
 
+                # SAP Experience Analysis
+                st.subheader("SAP Implementation Experience")
+                sap_exp = evaluation.get('sap_experience', {})
+                if sap_exp.get('has_implementation'):
+                    st.success("✓ Has SAP Implementation Experience")
+                else:
+                    st.error("✗ No SAP Implementation Experience")
+
+                st.write("**Implementation Details:**", sap_exp.get('details', 'No details available'))
+
+                if sap_exp.get('projects'):
+                    st.write("**SAP Implementation Projects:**")
+                    for project in sap_exp['projects']:
+                        st.write("•", project)
+
+                # Company Background Analysis
+                st.subheader("Company Background")
+                comp_bg = evaluation.get('company_background', {})
+                if comp_bg.get('has_it_services'):
+                    st.success("✓ Has IT Services Company Experience")
+                else:
+                    st.error("✗ No IT Services Company Experience")
+
+                if comp_bg.get('companies'):
+                    st.write("**Relevant Companies:**")
+                    for company in comp_bg['companies']:
+                        st.write("•", company)
+
+                if comp_bg.get('roles'):
+                    st.write("**Relevant Roles:**")
+                    for role in comp_bg['roles']:
+                        st.write("•", role)
+
                 # Experience Analysis
                 st.subheader("Experience Analysis")
                 exp_data = evaluation.get('years_of_experience', {})
-                cols = st.columns(3)
+                cols = st.columns(4)
                 with cols[0]:
                     st.metric("Total Experience", f"{exp_data.get('total', 0)} years")
                 with cols[1]:
                     st.metric("Relevant Experience", f"{exp_data.get('relevant', 0)} years")
                 with cols[2]:
+                    st.metric("SAP Implementation", f"{exp_data.get('sap_implementation', 0)} years")
+                with cols[3]:
                     st.metric("Required Experience", f"{exp_data.get('required', 0)} years")
 
                 # Detailed justification

@@ -272,7 +272,7 @@ class Database:
             evaluation_metrics.get('technical_skills', 0.0),
             evaluation_metrics.get('experience_relevance', 0.0),
             evaluation_metrics.get('education_match', 0.0),
-            evaluation_metrics.get('overall_technical_fit', 0.0),
+            evaluation_metrics.get('overall_fit', 0.0),
             json.dumps(recommendations.get('interview_focus', [])),
             json.dumps(recommendations.get('skill_gaps', [])),
             technical_assessment.get('technical_depth', 0.0),

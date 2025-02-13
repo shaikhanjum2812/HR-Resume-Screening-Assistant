@@ -386,11 +386,14 @@ def show_evaluation():
             try:
                 # Convert selected_indices to list and get the first selected row
                 selected_idx = next(iter(selected_indices))
-                if isinstance(selected_idx, (int, str)) and selected_idx < len(df):
-                    selected_row = df.iloc[int(selected_idx)]
-                    st.session_state.show_justification = True
-                    st.session_state.selected_eval = selected_row['ID']
-            except Exception as e:
+                if isinstance(selected_idx, (int, str)):
+                    # Convert to integer if it's a string
+                    idx = int(selected_idx) if isinstance(selected_idx, str) else selected_idx
+                    if 0 <= idx < len(df):
+                        selected_row = df.iloc[idx]
+                        st.session_state.show_justification = True
+                        st.session_state.selected_eval = selected_row['ID']
+            except (ValueError, TypeError) as e:
                 st.error(f"Error selecting row: {str(e)}")
                 return
 

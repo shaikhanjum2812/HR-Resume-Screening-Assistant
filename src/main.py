@@ -135,8 +135,47 @@ def show_evaluation():
 
                 # Display results
                 st.success("Evaluation Complete!")
-                st.write("Decision:", evaluation['decision'])
-                st.write("Justification:", evaluation['justification'])
+
+                # Decision with color coding
+                if evaluation['decision'] == 'shortlist':
+                    st.success(f"Decision: {evaluation['decision'].upper()}")
+                else:
+                    st.error(f"Decision: {evaluation['decision'].upper()}")
+
+                # Experience Analysis
+                st.subheader("Experience Analysis")
+                exp_data = evaluation.get('years_of_experience', {})
+                cols = st.columns(3)
+                with cols[0]:
+                    st.metric("Total Experience", f"{exp_data.get('total', 0)} years")
+                with cols[1]:
+                    st.metric("Relevant Experience", f"{exp_data.get('relevant', 0)} years")
+                with cols[2]:
+                    st.metric("Required Experience", f"{exp_data.get('required', 0)} years")
+
+                # Detailed justification
+                st.subheader("Evaluation Details")
+                st.write("**Justification:**", evaluation['justification'])
+
+                if 'experience_analysis' in evaluation:
+                    st.write("**Experience Relevance Analysis:**", evaluation['experience_analysis'])
+
+                # Match score with progress bar
+                st.subheader("Match Score")
+                st.progress(float(evaluation['match_score']))
+                st.write(f"Match Score: {evaluation['match_score']*100:.1f}%")
+
+                # Skills and Requirements
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write("**Matching Skills/Qualifications:**")
+                    for skill in evaluation['key_matches']:
+                        st.write("✓", skill)
+
+                with col2:
+                    st.write("**Missing Requirements:**")
+                    for req in evaluation['missing_requirements']:
+                        st.write("✗", req)
 
 def show_analytics():
     st.title("Analytics Dashboard")

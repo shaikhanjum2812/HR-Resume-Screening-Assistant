@@ -64,6 +64,18 @@ class Database:
 
         self.conn.commit()
 
+    def clear_evaluations(self):
+        """Safely remove all evaluation records while keeping the table structure."""
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('DELETE FROM evaluations')
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error clearing evaluations: {str(e)}")
+            self.conn.rollback()
+            return False
+
     def add_job_description(self, title, description, evaluation_criteria=None):
         cursor = self.conn.cursor()
         cursor.execute(

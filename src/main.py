@@ -296,6 +296,14 @@ def show_evaluation():
     with tab2:
         st.subheader("Evaluations")
 
+        # Add clear evaluations button
+        if st.button("🗑️ Clear All Evaluation Records", type="secondary"):
+            if db.clear_evaluations():
+                st.success("All evaluation records have been cleared successfully!")
+                st.rerun()
+            else:
+                st.error("Failed to clear evaluation records. Please try again.")
+
         # Period filter
         col1, col2 = st.columns([2, 3])
         with col1:

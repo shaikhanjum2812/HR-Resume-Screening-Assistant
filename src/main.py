@@ -372,16 +372,24 @@ def show_evaluation():
             df[['Sr No', 'Name', 'Job Title', 'Shortlisted', 'Score']],
             hide_index=True,
             disabled=True,
-            key='evaluation_table',
-            on_change=lambda: None
+            key='evaluation_table'
         )
+
+        # Initialize session state if needed
+        if 'show_justification' not in st.session_state:
+            st.session_state.show_justification = False
+        if 'selected_eval' not in st.session_state:
+            st.session_state.selected_eval = None
 
         # Handle row selection
         if selected_indices is not None and len(selected_indices) > 0:
             try:
-                selected_row = df.iloc[list(selected_indices)[0]]
-                st.session_state.show_justification = True
-                st.session_state.selected_eval = selected_row['ID']
+                # Convert selected_indices to list and get the first selected row
+                selected_idx = next(iter(selected_indices))
+                if isinstance(selected_idx, (int, str)) and selected_idx < len(df):
+                    selected_row = df.iloc[int(selected_idx)]
+                    st.session_state.show_justification = True
+                    st.session_state.selected_eval = selected_row['ID']
             except Exception as e:
                 st.error(f"Error selecting row: {str(e)}")
                 return

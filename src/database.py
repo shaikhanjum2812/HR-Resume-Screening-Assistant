@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 import json
 import psycopg2
+from psycopg2.pool import SimpleConnectionPool
 from psycopg2.extras import DictCursor
 import logging
 
@@ -10,17 +11,39 @@ logger = logging.getLogger(__name__)
 class Database:
     def __init__(self):
         try:
-            self.conn = psycopg2.connect(os.environ['DATABASE_URL'])
+            # Create a connection pool instead of a single connection
+            self.pool = SimpleConnectionPool(
+                minconn=1,
+                maxconn=10,
+                dsn=os.environ['DATABASE_URL'],
+                connect_timeout=3
+            )
             self.create_tables()
             logger.info("Database connection and tables initialized successfully")
         except Exception as e:
             logger.error(f"Database initialization error: {e}")
             raise
 
-    def create_tables(self):
-        cursor = self.conn.cursor()
+    def get_connection(self):
         try:
-            # Job Descriptions table
+            return self.pool.getconn()
+        except Exception as e:
+            logger.error(f"Error getting connection from pool: {e}")
+            raise
+
+    def return_connection(self, conn):
+        try:
+            self.pool.putconn(conn)
+        except Exception as e:
+            logger.error(f"Error returning connection to pool: {e}")
+
+    def create_tables(self):
+        conn = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Rest of the create_tables function remains the same
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS job_descriptions (
                 id SERIAL PRIMARY KEY,
@@ -31,7 +54,6 @@ class Database:
             )
             ''')
 
-            # Evaluation Criteria table
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS evaluation_criteria (
                 id SERIAL PRIMARY KEY,
@@ -46,7 +68,6 @@ class Database:
             )
             ''')
 
-            # Evaluations table
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS evaluations (
                 id SERIAL PRIMARY KEY,
@@ -70,42 +91,84 @@ class Database:
             )
             ''')
 
-            self.conn.commit()
+            conn.commit()
             logger.info("Database tables created successfully")
         except Exception as e:
-            self.conn.rollback()
+            if conn:
+                conn.rollback()
             logger.error(f"Error creating tables: {e}")
             raise
+        finally:
+            if conn:
+                self.return_connection(conn)
+
+    def execute_query(self, query, params=None, fetch=True, cursor_factory=None):
+        conn = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor(cursor_factory=cursor_factory)
+            cursor.execute(query, params or ())
+
+            if fetch:
+                result = cursor.fetchall()
+            else:
+                result = None
+
+            conn.commit()
+            return result
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            logger.error(f"Query execution error: {e}")
+            raise
+        finally:
+            if conn:
+                self.return_connection(conn)
+
+    def get_evaluations_by_period(self, period):
+        if period == 'week':
+            time_filter = "INTERVAL '7 days'"
+        elif period == 'month':
+            time_filter = "INTERVAL '30 days'"
+        elif period == 'quarter':
+            time_filter = "INTERVAL '90 days'"
+        else:  # year
+            time_filter = "INTERVAL '365 days'"
+
+        query = f'''
+            SELECT 
+                e.id, e.job_id, e.resume_name, 
+                e.candidate_name, e.candidate_email, e.candidate_phone,
+                e.result, e.justification, e.match_score, 
+                e.years_experience_total, e.years_experience_relevant,
+                e.years_experience_required, e.meets_experience_requirement,
+                e.evaluation_date, e.evaluation_data,
+                j.title as job_title
+            FROM evaluations e
+            JOIN job_descriptions j ON e.job_id = j.id
+            WHERE e.evaluation_date >= NOW() - {time_filter}
+            ORDER BY e.evaluation_date DESC
+        '''
+
+        return self.execute_query(query)
 
     def clear_evaluations(self):
-        """Safely remove all evaluation records while keeping the table structure."""
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute('DELETE FROM evaluations')
-            self.conn.commit()
-            return True
-        except Exception as e:
-            print(f"Error clearing evaluations: {str(e)}")
-            self.conn.rollback()
-            return False
+        return self.execute_query('DELETE FROM evaluations', fetch=False)
 
     def add_job_description(self, title, description, evaluation_criteria=None):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            'INSERT INTO job_descriptions (title, description) VALUES (%s, %s) RETURNING id',
-            (title, description)
-        )
-        job_id = cursor.fetchone()[0]
+        query = 'INSERT INTO job_descriptions (title, description) VALUES (%s, %s) RETURNING id'
+        job_id = self.execute_query(query, (title, description))[0][0]
 
         if evaluation_criteria:
-            cursor.execute('''
+            query = '''
                 INSERT INTO evaluation_criteria (
                     job_id, min_years_experience, required_skills,
                     preferred_skills, education_requirements,
                     company_background_requirements, domain_experience_requirements,
                     additional_instructions
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (
+            '''
+            params = (
                 job_id,
                 evaluation_criteria.get('min_years_experience', 0),
                 json.dumps(evaluation_criteria.get('required_skills', [])),
@@ -114,20 +177,19 @@ class Database:
                 evaluation_criteria.get('company_background_requirements', ''),
                 evaluation_criteria.get('domain_experience_requirements', ''),
                 evaluation_criteria.get('additional_instructions', '')
-            ))
+            )
+            self.execute_query(query, params, fetch=False)
 
-        self.conn.commit()
         return job_id
 
     def get_all_jobs(self):
-        cursor = self.conn.cursor()
-        cursor.execute('''
+        query = '''
             SELECT j.id, j.title, j.description, j.date_created, e.id
             FROM job_descriptions j
             LEFT JOIN evaluation_criteria e ON j.id = e.job_id
             WHERE j.active = true
-        ''')
-        jobs = cursor.fetchall()
+        '''
+        jobs = self.execute_query(query)
         return [
             {
                 'id': job[0],
@@ -139,20 +201,13 @@ class Database:
             for job in jobs
         ]
 
+
     def delete_job(self, job_id):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            'UPDATE job_descriptions SET active = false WHERE id = %s',
-            (job_id,)
-        )
-        self.conn.commit()
+        query = 'UPDATE job_descriptions SET active = false WHERE id = %s'
+        self.execute_query(query, (job_id,), fetch=False)
 
     def save_evaluation(self, job_id, resume_name, evaluation_result):
-        """
-        Save the complete evaluation results to the database
-        """
-        cursor = self.conn.cursor()
-        cursor.execute('''
+        query = '''
             INSERT INTO evaluations (
                 job_id, resume_name, candidate_name, candidate_email, candidate_phone,
                 result, justification, match_score, years_experience_total,
@@ -160,7 +215,8 @@ class Database:
                 meets_experience_requirement, key_matches, missing_requirements,
                 experience_analysis, evaluation_data
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (
+        '''
+        params = (
             job_id,
             resume_name,
             evaluation_result.get('candidate_info', {}).get('name', ''),
@@ -177,39 +233,12 @@ class Database:
             json.dumps(evaluation_result['missing_requirements']),
             evaluation_result['experience_analysis'],
             json.dumps(evaluation_result)
-        ))
-        self.conn.commit()
+        )
 
-    def get_evaluations_by_period(self, period):
-        cursor = self.conn.cursor()
-        if period == 'week':
-            time_filter = "INTERVAL '7 days'"
-        elif period == 'month':
-            time_filter = "INTERVAL '30 days'"
-        elif period == 'quarter':
-            time_filter = "INTERVAL '90 days'"
-        else:  # year
-            time_filter = "INTERVAL '365 days'"
-
-        cursor.execute(f'''
-            SELECT 
-                e.id, e.job_id, e.resume_name, 
-                e.candidate_name, e.candidate_email, e.candidate_phone,
-                e.result, e.justification, e.match_score, 
-                e.years_experience_total, e.years_experience_relevant,
-                e.years_experience_required, e.meets_experience_requirement,
-                e.evaluation_date, e.evaluation_data,
-                j.title as job_title
-            FROM evaluations e
-            JOIN job_descriptions j ON e.job_id = j.id
-            WHERE e.evaluation_date >= NOW() - {time_filter}
-            ORDER BY e.evaluation_date DESC
-        ''')
-        return cursor.fetchall()
+        self.execute_query(query, params, fetch=False)
 
     def get_evaluations_by_date_range(self, start_date, end_date):
-        cursor = self.conn.cursor()
-        cursor.execute('''
+        query = '''
             SELECT 
                 e.id, e.job_id, e.resume_name, e.result, e.justification,
                 e.match_score, e.years_experience_total, e.years_experience_relevant,
@@ -221,77 +250,55 @@ class Database:
             JOIN job_descriptions j ON e.job_id = j.id
             WHERE DATE(e.evaluation_date) BETWEEN %s AND %s
             ORDER BY e.evaluation_date DESC
-        ''', (start_date, end_date))
-        return cursor.fetchall()
+        '''
+        return self.execute_query(query,(start_date, end_date))
 
     def get_active_jobs_count(self):
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute('SELECT COUNT(*) FROM job_descriptions WHERE active = true')
-            result = cursor.fetchone()
-            return result[0] if result else 0
-        except Exception as e:
-            logger.error(f"Error getting active jobs count: {e}")
-            return 0
+        return self.execute_query('SELECT COUNT(*) FROM job_descriptions WHERE active = true')[0][0]
 
     def get_today_evaluations_count(self):
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute('''
+        query = '''
                 SELECT COUNT(*) FROM evaluations 
                 WHERE DATE(evaluation_date) = CURRENT_DATE
-            ''')
-            result = cursor.fetchone()
-            return result[0] if result else 0
-        except Exception as e:
-            logger.error(f"Error getting today's evaluations count: {e}")
-            return 0
+            '''
+        return self.execute_query(query)[0][0]
 
     def get_evaluation_criteria(self, job_id):
-        cursor = self.conn.cursor()
-        cursor.execute(
-            'SELECT * FROM evaluation_criteria WHERE job_id = %s',
-            (job_id,)
-        )
-        criteria = cursor.fetchone()
-
+        query = 'SELECT * FROM evaluation_criteria WHERE job_id = %s'
+        criteria = self.execute_query(query, (job_id,))
         if criteria:
             return {
-                'min_years_experience': criteria[2],
-                'required_skills': json.loads(criteria[3]),
-                'preferred_skills': json.loads(criteria[4]),
-                'education_requirements': criteria[5],
-                'company_background_requirements': criteria[6],
-                'domain_experience_requirements': criteria[7],
-                'additional_instructions': criteria[8]
+                'min_years_experience': criteria[0][2],
+                'required_skills': json.loads(criteria[0][3]),
+                'preferred_skills': json.loads(criteria[0][4]),
+                'education_requirements': criteria[0][5],
+                'company_background_requirements': criteria[0][6],
+                'domain_experience_requirements': criteria[0][7],
+                'additional_instructions': criteria[0][8]
             }
         return None
 
     def get_evaluation_details(self, evaluation_id):
-        """
-        Retrieve detailed evaluation results
-        """
-        cursor = self.conn.cursor(cursor_factory=DictCursor)
-        cursor.execute('''
+        query = '''
             SELECT * FROM evaluations WHERE id = %s
-        ''', (evaluation_id,))
-        eval_data = cursor.fetchone()
+        '''
+        eval_data = self.execute_query(query, (evaluation_id,),cursor_factory=psycopg2.extras.DictCursor)
         if eval_data:
             return {
-                'id': eval_data['id'],
-                'job_id': eval_data['job_id'],
-                'resume_name': eval_data['resume_name'],
-                'result': eval_data['result'],
-                'justification': eval_data['justification'],
-                'match_score': eval_data['match_score'],
-                'years_experience_total': eval_data['years_experience_total'],
-                'years_experience_relevant': eval_data['years_experience_relevant'],
-                'years_experience_required': eval_data['years_experience_required'],
-                'meets_experience_requirement': eval_data['meets_experience_requirement'],
-                'key_matches': json.loads(eval_data['key_matches']),
-                'missing_requirements': json.loads(eval_data['missing_requirements']),
-                'experience_analysis': eval_data['experience_analysis'],
-                'evaluation_date': eval_data['evaluation_date'],
-                'evaluation_data': json.loads(eval_data['evaluation_data'])
+                'id': eval_data[0]['id'],
+                'job_id': eval_data[0]['job_id'],
+                'resume_name': eval_data[0]['resume_name'],
+                'result': eval_data[0]['result'],
+                'justification': eval_data[0]['justification'],
+                'match_score': eval_data[0]['match_score'],
+                'years_experience_total': eval_data[0]['years_experience_total'],
+                'years_experience_relevant': eval_data[0]['years_experience_relevant'],
+                'years_experience_required': eval_data[0]['years_experience_required'],
+                'meets_experience_requirement': eval_data[0]['meets_experience_requirement'],
+                'key_matches': json.loads(eval_data[0]['key_matches']),
+                'missing_requirements': json.loads(eval_data[0]['missing_requirements']),
+                'experience_analysis': eval_data[0]['experience_analysis'],
+                'evaluation_date': eval_data[0]['evaluation_date'],
+                'evaluation_data': json.loads(eval_data[0]['evaluation_data'])
             }
         return None

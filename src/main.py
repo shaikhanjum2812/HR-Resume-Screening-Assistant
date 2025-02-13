@@ -363,7 +363,7 @@ def show_evaluation():
                     continue
 
                 # Create card for each evaluation
-                with st.expander(f"📄 {eval_data['resume_name']} - {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
+                with st.expander(f"📄 Candidate: {eval_data['resume_name']} | Position: {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
                     cols = st.columns([2, 1, 1])
 
                     with cols[0]:

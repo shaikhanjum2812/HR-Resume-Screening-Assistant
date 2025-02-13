@@ -5,6 +5,7 @@ import psycopg2
 from psycopg2.pool import SimpleConnectionPool
 from psycopg2.extras import DictCursor
 import logging
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -24,114 +25,113 @@ class Database:
             logger.error(f"Database initialization error: {e}")
             raise
 
+    @contextmanager
     def get_connection(self):
-        try:
-            return self.pool.getconn()
-        except Exception as e:
-            logger.error(f"Error getting connection from pool: {e}")
-            raise
-
-    def return_connection(self, conn):
-        try:
-            self.pool.putconn(conn)
-        except Exception as e:
-            logger.error(f"Error returning connection to pool: {e}")
-
-    def create_tables(self):
+        """Context manager for database connections"""
         conn = None
         try:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS job_descriptions (
-                id SERIAL PRIMARY KEY,
-                title TEXT NOT NULL,
-                description TEXT NOT NULL,
-                date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                active BOOLEAN DEFAULT TRUE
-            )
-            ''')
-
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS evaluation_criteria (
-                id SERIAL PRIMARY KEY,
-                job_id INTEGER REFERENCES job_descriptions(id),
-                min_years_experience INTEGER,
-                required_skills TEXT,
-                preferred_skills TEXT,
-                education_requirements TEXT,
-                company_background_requirements TEXT,
-                domain_experience_requirements TEXT,
-                additional_instructions TEXT
-            )
-            ''')
-
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS evaluations (
-                id SERIAL PRIMARY KEY,
-                job_id INTEGER REFERENCES job_descriptions(id),
-                resume_name TEXT NOT NULL,
-                candidate_name TEXT,
-                candidate_email TEXT,
-                candidate_phone TEXT,
-                candidate_location TEXT,
-                linkedin_profile TEXT,
-                result TEXT NOT NULL,
-                justification TEXT NOT NULL,
-                match_score FLOAT,
-                confidence_score FLOAT,
-                years_experience_total FLOAT,
-                years_experience_relevant FLOAT,
-                years_experience_required FLOAT,
-                meets_experience_requirement BOOLEAN,
-                key_matches TEXT,
-                missing_requirements TEXT,
-                experience_analysis TEXT,
-                technical_skills_score FLOAT,
-                experience_relevance_score FLOAT,
-                education_match_score FLOAT,
-                overall_fit_score FLOAT,
-                interview_focus TEXT,
-                skill_gaps TEXT,
-                evaluation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                evaluation_data TEXT
-            )
-            ''')
-
-            conn.commit()
-            logger.info("Database tables created successfully")
+            conn = self.pool.getconn()
+            yield conn
         except Exception as e:
+            logger.error(f"Error with database connection: {e}")
             if conn:
                 conn.rollback()
-            logger.error(f"Error creating tables: {e}")
             raise
         finally:
             if conn:
-                self.return_connection(conn)
+                self.pool.putconn(conn)
 
     def execute_query(self, query, params=None, fetch=True, cursor_factory=None):
-        conn = None
-        try:
-            conn = self.get_connection()
-            cursor = conn.cursor(cursor_factory=cursor_factory)
-            cursor.execute(query, params or ())
+        """Execute a query with proper connection handling"""
+        with self.get_connection() as conn:
+            with conn.cursor(cursor_factory=cursor_factory) as cursor:
+                try:
+                    cursor.execute(query, params or ())
+                    if fetch:
+                        result = cursor.fetchall()
+                    else:
+                        result = None
+                    conn.commit()
+                    return result
+                except Exception as e:
+                    logger.error(f"Query execution error: {e}")
+                    conn.rollback()
+                    raise
 
-            if fetch:
-                result = cursor.fetchall()
-            else:
-                result = None
+    def create_tables(self):
+        """Create necessary database tables if they don't exist"""
+        with self.get_connection() as conn:
+            with conn.cursor() as cursor:
+                try:
+                    # Create tables with the updated schema
+                    cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS job_descriptions (
+                        id SERIAL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        active BOOLEAN DEFAULT TRUE
+                    )
+                    ''')
 
-            conn.commit()
-            return result
-        except Exception as e:
-            if conn:
-                conn.rollback()
-            logger.error(f"Query execution error: {e}")
-            raise
-        finally:
-            if conn:
-                self.return_connection(conn)
+                    cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS evaluation_criteria (
+                        id SERIAL PRIMARY KEY,
+                        job_id INTEGER REFERENCES job_descriptions(id),
+                        min_years_experience INTEGER,
+                        required_skills TEXT,
+                        preferred_skills TEXT,
+                        education_requirements TEXT,
+                        company_background_requirements TEXT,
+                        domain_experience_requirements TEXT,
+                        additional_instructions TEXT
+                    )
+                    ''')
+
+                    cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS evaluations (
+                        id SERIAL PRIMARY KEY,
+                        job_id INTEGER REFERENCES job_descriptions(id),
+                        resume_name TEXT NOT NULL,
+                        candidate_name TEXT,
+                        candidate_email TEXT,
+                        candidate_phone TEXT,
+                        candidate_location TEXT,
+                        linkedin_profile TEXT,
+                        result TEXT NOT NULL,
+                        justification TEXT NOT NULL,
+                        match_score FLOAT,
+                        confidence_score FLOAT,
+                        years_experience_total FLOAT,
+                        years_experience_relevant FLOAT,
+                        years_experience_required FLOAT,
+                        meets_experience_requirement BOOLEAN,
+                        key_matches TEXT,
+                        missing_requirements TEXT,
+                        experience_analysis TEXT,
+                        technical_skills_score FLOAT,
+                        experience_relevance_score FLOAT,
+                        education_match_score FLOAT,
+                        overall_fit_score FLOAT,
+                        interview_focus TEXT,
+                        skill_gaps TEXT,
+                        technical_depth FLOAT,
+                        problem_solving_score FLOAT,
+                        project_complexity_score FLOAT,
+                        implementation_experience_score FLOAT,
+                        project_expertise_score FLOAT,
+                        experience_quality_score FLOAT,
+                        evaluation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        evaluation_data TEXT
+                    )
+                    ''')
+
+                    conn.commit()
+                    logger.info("Database tables created successfully")
+                except Exception as e:
+                    logger.error(f"Error creating tables: {e}")
+                    conn.rollback()
+                    raise
 
     def get_evaluations_by_period(self, period):
         if period == 'week':

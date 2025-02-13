@@ -337,7 +337,7 @@ def show_evaluation():
             st.info("No evaluations found for the selected period.")
             return
 
-        # Create DataFrame for display
+        # Create DataFrame for display with clickable rows
         eval_data = []
         for idx, eval_record in enumerate(evaluations, 1):
             try:
@@ -357,33 +357,49 @@ def show_evaluation():
         # Create DataFrame
         df = pd.DataFrame(eval_data)
 
-        # Create the table display
-        st.dataframe(
+        # Add CSS to make rows clickable and show hover effect
+        st.markdown("""
+        <style>
+        .stDataFrame [data-testid="stDataFrameRow"]:hover {
+            background: rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Display table with clickable rows
+        selected_indices = st.data_editor(
             df[['Sr No', 'Name', 'Job Title', 'Shortlisted', 'Score']],
-            hide_index=True
+            hide_index=True,
+            disabled=True,
+            key='evaluation_table',
+            on_change=lambda: None
         )
 
-        # Modal window for justification
-        if 'show_justification' not in st.session_state:
-            st.session_state.show_justification = False
-            st.session_state.selected_eval = None
-
-        # Button to show justification for each row
-        for idx, row in df.iterrows():
-            if st.button(f"View Details #{row['Sr No']}", key=f"view_{row['ID']}"):
-                st.session_state.show_justification = True
-                st.session_state.selected_eval = row['ID']
+        # Handle row selection
+        if selected_indices is not None and len(selected_indices) > 0:
+            selected_row = df.iloc[selected_indices[0]]
+            st.session_state.show_justification = True
+            st.session_state.selected_eval = selected_row['ID']
 
         # Show modal with justification
         if st.session_state.show_justification and st.session_state.selected_eval:
             with st.expander("Evaluation Details", expanded=True):
+                # Add close button at the top
+                col1, col2 = st.columns([6, 1])
+                with col2:
+                    if st.button("✕ Close", key="close_details"):
+                        st.session_state.show_justification = False
+                        st.session_state.selected_eval = None
+                        st.rerun()
+
                 details = db.get_evaluation_details(st.session_state.selected_eval)
                 if details:
                     try:
                         st.write("### Evaluation Summary")
                         cols = st.columns([2, 1, 1])
                         with cols[0]:
-                            st.metric("Match Score", details['match_score'])
+                            st.metric("Match Score", f"{details['match_score']*100:.1f}%")
                         with cols[1]:
                             st.metric("Total Experience", f"{details['years_experience_total']} years")
                         with cols[2]:
@@ -412,10 +428,6 @@ def show_evaluation():
                             for req in details['missing_requirements']:
                                 st.write(f"✗ {req}")
 
-                        if st.button("Close Details"):
-                            st.session_state.show_justification = False
-                            st.session_state.selected_eval = None
-                            st.rerun()
                     except Exception as e:
                         st.error(f"Error displaying evaluation details: {str(e)}")
                 else:
@@ -424,6 +436,7 @@ def show_evaluation():
                         st.session_state.show_justification = False
                         st.session_state.selected_eval = None
                         st.rerun()
+
 
 def show_analytics():
     st.title("Analytics Dashboard")

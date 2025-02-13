@@ -441,21 +441,41 @@ def show_evaluation():
                             st.write("**Phone:**", eval_data['candidate_phone'] or "Not available")
                         st.markdown("---")  # Add a separator line
 
-                    # Evaluation results
-                    result_cols = st.columns([2, 1, 1])
-                    with result_cols[0]:
-                        if decision == 'SHORTLIST':
-                            st.success(f"Decision: {decision}")
-                        else:
-                            st.error(f"Decision: {decision}")
-
-                    with result_cols[1]:
-                        st.metric("Match Score", f"{eval_data['match_score']*100:.1f}%")
-
                     # Get detailed evaluation data
                     details = st.session_state.components['db'].get_evaluation_details(eval_data['id'])
                     if details:
-                        st.write("#### Key Information")
+                        # Overall Decision and Scores
+                        st.write("#### Overall Assessment")
+                        metrics_cols = st.columns(4)
+                        with metrics_cols[0]:
+                            if decision == 'SHORTLIST':
+                                st.success(f"Decision: {decision}")
+                            else:
+                                st.error(f"Decision: {decision}")
+                        with metrics_cols[1]:
+                            st.metric("Match Score", f"{eval_data['match_score']*100:.1f}%")
+                        with metrics_cols[2]:
+                            confidence = details['evaluation_data'].get('confidence_score', 0.0)
+                            st.metric("Confidence", f"{confidence*100:.1f}%")
+                        with metrics_cols[3]:
+                            overall_fit = details['evaluation_data'].get('evaluation_metrics', {}).get('overall_fit', 0.0)
+                            st.metric("Overall Fit", f"{overall_fit*100:.1f}%")
+
+                        # Detailed Metrics
+                        st.write("#### Evaluation Metrics")
+                        metric_cols = st.columns(4)
+                        metrics = details['evaluation_data'].get('evaluation_metrics', {})
+                        with metric_cols[0]:
+                            st.metric("Technical Skills", f"{metrics.get('technical_skills', 0.0)*100:.1f}%")
+                        with metric_cols[1]:
+                            st.metric("Experience Relevance", f"{metrics.get('experience_relevance', 0.0)*100:.1f}%")
+                        with metric_cols[2]:
+                            st.metric("Education Match", f"{metrics.get('education_match', 0.0)*100:.1f}%")
+                        with metric_cols[3]:
+                            st.metric("Overall Fit", f"{metrics.get('overall_fit', 0.0)*100:.1f}%")
+
+                        # Experience Analysis
+                        st.write("#### Experience Analysis")
                         exp_cols = st.columns(3)
                         with exp_cols[0]:
                             st.metric("Total Experience", f"{details['years_experience_total']} years")
@@ -464,20 +484,62 @@ def show_evaluation():
                         with exp_cols[2]:
                             st.metric("Required Experience", f"{details['years_experience_required']} years")
 
+                        # Justification
                         st.write("#### Evaluation Summary")
                         st.write(details['justification'])
 
-                        # Skills and Requirements in columns
-                        sk_cols = st.columns(2)
-                        with sk_cols[0]:
-                            st.write("**Key Matches:**")
-                            for skill in details['key_matches']:
-                                st.write(f"✓ {skill}")
+                        # Skills and Requirements
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write("**Matching Skills:**")
+                            key_matches = details['key_matches']
+                            if isinstance(key_matches, dict):
+                                if key_matches.get('skills'):
+                                    st.write("*Technical Skills:*")
+                                    for skill in key_matches['skills']:
+                                        st.write(f"✓ {skill}")
+                                if key_matches.get('experience'):
+                                    st.write("*Relevant Experience:*")
+                                    for exp in key_matches['experience']:
+                                        st.write(f"✓ {exp}")
+                                if key_matches.get('certifications'):
+                                    st.write("*Certifications:*")
+                                    for cert in key_matches['certifications']:
+                                        st.write(f"✓ {cert}")
+                            else:
+                                for match in key_matches:
+                                    st.write(f"✓ {match}")
 
-                        with sk_cols[1]:
+                        with col2:
                             st.write("**Missing Requirements:**")
-                            for req in details['missing_requirements']:
-                                st.write(f"✗ {req}")
+                            missing_reqs = details['missing_requirements']
+                            if isinstance(missing_reqs, dict):
+                                if missing_reqs.get('critical'):
+                                    st.write("*Critical Requirements:*")
+                                    for req in missing_reqs['critical']:
+                                        st.write(f"✗ {req}")
+                                if missing_reqs.get('preferred'):
+                                    st.write("*Preferred Requirements:*")
+                                    for req in missing_reqs['preferred']:
+                                        st.write(f"✗ {req}")
+                            else:
+                                for req in missing_reqs:
+                                    st.write(f"✗ {req}")
+
+                        # Recommendations
+                        st.write("#### Recommendations")
+                        rec_cols = st.columns(2)
+                        with rec_cols[0]:
+                            st.write("**Interview Focus Areas:**")
+                            interview_focus = json.loads(details.get('interview_focus', '[]'))
+                            for focus in interview_focus:
+                                st.write(f"• {focus}")
+
+                        with rec_cols[1]:
+                            st.write("**Skill Development Areas:**")
+                            skill_gaps = json.loads(details.get('skill_gaps', '[]'))
+                            for gap in skill_gaps:
+                                st.write(f"• {gap}")
 
                         # Download buttons
                         dl_cols = st.columns(2)

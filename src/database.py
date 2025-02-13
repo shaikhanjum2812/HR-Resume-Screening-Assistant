@@ -43,7 +43,6 @@ class Database:
             conn = self.get_connection()
             cursor = conn.cursor()
 
-            # Rest of the create_tables function remains the same
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS job_descriptions (
                 id SERIAL PRIMARY KEY,
@@ -76,9 +75,12 @@ class Database:
                 candidate_name TEXT,
                 candidate_email TEXT,
                 candidate_phone TEXT,
+                candidate_location TEXT,
+                linkedin_profile TEXT,
                 result TEXT NOT NULL,
                 justification TEXT NOT NULL,
                 match_score FLOAT,
+                confidence_score FLOAT,
                 years_experience_total FLOAT,
                 years_experience_relevant FLOAT,
                 years_experience_required FLOAT,
@@ -86,6 +88,12 @@ class Database:
                 key_matches TEXT,
                 missing_requirements TEXT,
                 experience_analysis TEXT,
+                technical_skills_score FLOAT,
+                experience_relevance_score FLOAT,
+                education_match_score FLOAT,
+                overall_fit_score FLOAT,
+                interview_focus TEXT,
+                skill_gaps TEXT,
                 evaluation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 evaluation_data TEXT
             )
@@ -209,29 +217,46 @@ class Database:
     def save_evaluation(self, job_id, resume_name, evaluation_result):
         query = '''
             INSERT INTO evaluations (
-                job_id, resume_name, candidate_name, candidate_email, candidate_phone,
-                result, justification, match_score, years_experience_total,
-                years_experience_relevant, years_experience_required,
+                job_id, resume_name, 
+                candidate_name, candidate_email, candidate_phone, candidate_location, linkedin_profile,
+                result, justification, match_score, confidence_score,
+                years_experience_total, years_experience_relevant, years_experience_required,
                 meets_experience_requirement, key_matches, missing_requirements,
-                experience_analysis, evaluation_data
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                experience_analysis, technical_skills_score, experience_relevance_score,
+                education_match_score, overall_fit_score, interview_focus, skill_gaps,
+                evaluation_data
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         '''
+
+        candidate_info = evaluation_result.get('candidate_info', {})
+        evaluation_metrics = evaluation_result.get('evaluation_metrics', {})
+        recommendations = evaluation_result.get('recommendations', {})
+
         params = (
             job_id,
             resume_name,
-            evaluation_result.get('candidate_info', {}).get('name', ''),
-            evaluation_result.get('candidate_info', {}).get('email', ''),
-            evaluation_result.get('candidate_info', {}).get('phone', ''),
+            candidate_info.get('name', ''),
+            candidate_info.get('email', ''),
+            candidate_info.get('phone', ''),
+            candidate_info.get('location', ''),
+            candidate_info.get('linkedin', ''),
             evaluation_result['decision'],
             evaluation_result['justification'],
             evaluation_result['match_score'],
+            evaluation_result.get('confidence_score', 0.0),
             evaluation_result['years_of_experience']['total'],
             evaluation_result['years_of_experience']['relevant'],
             evaluation_result['years_of_experience']['required'],
             evaluation_result['years_of_experience']['meets_requirement'],
             json.dumps(evaluation_result['key_matches']),
             json.dumps(evaluation_result['missing_requirements']),
-            evaluation_result['experience_analysis'],
+            evaluation_result['years_of_experience'].get('details', ''),
+            evaluation_metrics.get('technical_skills', 0.0),
+            evaluation_metrics.get('experience_relevance', 0.0),
+            evaluation_metrics.get('education_match', 0.0),
+            evaluation_metrics.get('overall_fit', 0.0),
+            json.dumps(recommendations.get('interview_focus', [])),
+            json.dumps(recommendations.get('skill_gaps', [])),
             json.dumps(evaluation_result)
         )
 

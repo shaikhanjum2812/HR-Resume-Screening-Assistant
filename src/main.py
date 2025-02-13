@@ -296,6 +296,17 @@ def show_evaluation():
                     # Display results
                     st.success("Evaluation Complete!")
 
+                    # Candidate Information Section
+                    st.subheader("Candidate Information")
+                    candidate_info = evaluation.get('candidate_info', {})
+                    info_cols = st.columns(3)
+                    with info_cols[0]:
+                        st.write("**Name:**", candidate_info.get('name', 'Not found'))
+                    with info_cols[1]:
+                        st.write("**Email:**", candidate_info.get('email', 'Not found'))
+                    with info_cols[2]:
+                        st.write("**Phone:**", candidate_info.get('phone', 'Not found'))
+
                     # Decision with color coding
                     result = evaluation.get('decision', '').upper()
                     if result == 'SHORTLIST':

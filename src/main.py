@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import os
+import json # added for json download
 from database import Database
 from ai_evaluator import AIEvaluator
 from pdf_processor import PDFProcessor
@@ -337,120 +338,92 @@ def show_evaluation():
             st.info("No evaluations found for the selected period.")
             return
 
-        # Create DataFrame for display with clickable rows
-        eval_data = []
-        for idx, eval_record in enumerate(evaluations, 1):
+        # Display evaluations as cards
+        st.write("### Evaluation Results")
+
+        # Add search/filter options
+        search_term = st.text_input("Search by resume name or job title", "")
+
+        # Process evaluations
+        for eval_record in evaluations:
             try:
-                eval_data.append({
-                    'Sr No': idx,
-                    'Name': eval_record[2],  # resume_name
-                    'Job Title': eval_record[15],  # job_title from JOIN
-                    'Shortlisted': "Yes" if eval_record[3] == "shortlist" else "No",  # result
-                    'Score': f"{float(eval_record[5])*100:.1f}%" if eval_record[5] is not None else "N/A",  # match_score
-                    'Justification': eval_record[4],  # justification
-                    'ID': eval_record[0]  # evaluation id
-                })
-            except (IndexError, TypeError) as e:
-                st.error(f"Error processing evaluation record: {str(e)}")
-                continue
+                # Extract evaluation data
+                eval_data = {
+                    'id': eval_record[0],
+                    'resume_name': eval_record[2],
+                    'job_title': eval_record[15],
+                    'result': eval_record[3],
+                    'match_score': eval_record[5],
+                    'evaluation_date': eval_record[13]
+                }
 
-        # Create DataFrame
-        df = pd.DataFrame(eval_data)
+                # Apply search filter
+                if search_term.lower() not in eval_data['resume_name'].lower() and \
+                   search_term.lower() not in eval_data['job_title'].lower():
+                    continue
 
-        # Add CSS to make rows clickable and show hover effect
-        st.markdown("""
-        <style>
-        .stDataFrame [data-testid="stDataFrameRow"]:hover {
-            background: rgba(0, 0, 0, 0.05);
-            cursor: pointer;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+                # Create card for each evaluation
+                with st.expander(f"📄 {eval_data['resume_name']} - {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
+                    cols = st.columns([2, 1, 1])
 
-        # Display table with clickable rows
-        selected_indices = st.data_editor(
-            df[['Sr No', 'Name', 'Job Title', 'Shortlisted', 'Score']],
-            hide_index=True,
-            disabled=True,
-            key='evaluation_table'
-        )
-
-        # Initialize session state if needed
-        if 'show_justification' not in st.session_state:
-            st.session_state.show_justification = False
-        if 'selected_eval' not in st.session_state:
-            st.session_state.selected_eval = None
-
-        # Handle row selection
-        if selected_indices is not None and len(selected_indices) > 0:
-            try:
-                # Convert selected_indices to list and get the first selected row
-                selected_idx = next(iter(selected_indices))
-                if isinstance(selected_idx, (int, str)):
-                    # Convert to integer if it's a string
-                    idx = int(selected_idx) if isinstance(selected_idx, str) else selected_idx
-                    if 0 <= idx < len(df):
-                        selected_row = df.iloc[idx]
-                        st.session_state.show_justification = True
-                        st.session_state.selected_eval = selected_row['ID']
-            except (ValueError, TypeError) as e:
-                st.error(f"Error selecting row: {str(e)}")
-                return
-
-        # Show modal with justification
-        if st.session_state.show_justification and st.session_state.selected_eval:
-            with st.expander("Evaluation Details", expanded=True):
-                # Add close button at the top
-                col1, col2 = st.columns([6, 1])
-                with col2:
-                    if st.button("✕ Close", key="close_details"):
-                        st.session_state.show_justification = False
-                        st.session_state.selected_eval = None
-                        st.rerun()
-
-                details = db.get_evaluation_details(st.session_state.selected_eval)
-                if details:
-                    try:
-                        st.write("### Evaluation Summary")
-                        cols = st.columns([2, 1, 1])
-                        with cols[0]:
-                            st.metric("Match Score", f"{details['match_score']*100:.1f}%")
-                        with cols[1]:
-                            st.metric("Total Experience", f"{details['years_experience_total']} years")
-                        with cols[2]:
-                            st.metric("Relevant Experience", f"{details['years_experience_relevant']} years")
-
-                        st.write("### Decision")
-                        if details['result'] == 'shortlist':
-                            st.success(f"Decision: {details['result'].upper()}")
+                    with cols[0]:
+                        if eval_data['result'] == 'shortlist':
+                            st.success(f"Decision: {eval_data['result'].upper()}")
                         else:
-                            st.error(f"Decision: {details['result'].upper()}")
+                            st.error(f"Decision: {eval_data['result'].upper()}")
 
-                        st.write("### Justification")
+                    with cols[1]:
+                        st.metric("Match Score", f"{float(eval_data['match_score'])*100:.1f}%")
+
+                    # Get detailed evaluation data
+                    details = db.get_evaluation_details(eval_data['id'])
+                    if details:
+                        st.write("#### Key Information")
+                        exp_cols = st.columns(3)
+                        with exp_cols[0]:
+                            st.metric("Total Experience", f"{details['years_experience_total']} years")
+                        with exp_cols[1]:
+                            st.metric("Relevant Experience", f"{details['years_experience_relevant']} years")
+                        with exp_cols[2]:
+                            st.metric("Required Experience", f"{details['years_experience_required']} years")
+
+                        st.write("#### Evaluation Summary")
                         st.write(details['justification'])
 
-                        st.write("### Experience Analysis")
-                        st.write(details['experience_analysis'])
-
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.write("### Key Matches")
+                        # Skills and Requirements in columns
+                        sk_cols = st.columns(2)
+                        with sk_cols[0]:
+                            st.write("**Key Matches:**")
                             for skill in details['key_matches']:
                                 st.write(f"✓ {skill}")
 
-                        with col2:
-                            st.write("### Missing Requirements")
+                        with sk_cols[1]:
+                            st.write("**Missing Requirements:**")
                             for req in details['missing_requirements']:
                                 st.write(f"✗ {req}")
 
-                    except Exception as e:
-                        st.error(f"Error displaying evaluation details: {str(e)}")
-                else:
-                    st.warning("Detailed evaluation data not available for this record.")
-                    if st.button("Close"):
-                        st.session_state.show_justification = False
-                        st.session_state.selected_eval = None
-                        st.rerun()
+                        # Download buttons
+                        dl_cols = st.columns(2)
+                        with dl_cols[0]:
+                            # Create downloadable JSON with full evaluation details
+                            evaluation_json = json.dumps(details['evaluation_data'], indent=2)
+                            st.download_button(
+                                label="📥 Download Detailed Report",
+                                data=evaluation_json,
+                                file_name=f"evaluation_{eval_data['id']}.json",
+                                mime="application/json"
+                            )
+
+                        with dl_cols[1]:
+                            st.write("Resume download option will be added here")
+
+            except Exception as e:
+                st.error(f"Error displaying evaluation: {str(e)}")
+                continue
+
+        # Handle row selection (removed, replaced by card system)
+
+        # Show modal with justification (removed, integrated into cards)
 
 
 def show_analytics():

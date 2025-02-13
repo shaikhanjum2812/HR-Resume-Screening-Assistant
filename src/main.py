@@ -407,14 +407,15 @@ def show_evaluation():
                 # Extract evaluation data
                 eval_data = {
                     'id': eval_record[0],
+                    'job_id': eval_record[1],
                     'resume_name': eval_record[2],
                     'candidate_name': eval_record[3],
                     'candidate_email': eval_record[4],
                     'candidate_phone': eval_record[5],
-                    'result': str(eval_record[6]),
-                    'job_title': eval_record[15],
+                    'result': eval_record[6],
                     'match_score': float(eval_record[8]) if eval_record[8] is not None else 0.0,
-                    'evaluation_date': eval_record[13]
+                    'evaluation_date': eval_record[13],
+                    'job_title': eval_record[15]
                 }
 
                 # Apply search filter

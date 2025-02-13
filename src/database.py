@@ -193,10 +193,11 @@ class Database:
 
         cursor.execute(f'''
             SELECT 
-                e.id, e.job_id, e.resume_name, e.result, e.justification,
-                e.match_score, e.years_experience_total, e.years_experience_relevant,
+                e.id, e.job_id, e.resume_name, 
+                e.candidate_name, e.candidate_email, e.candidate_phone,
+                e.result, e.justification, e.match_score, 
+                e.years_experience_total, e.years_experience_relevant,
                 e.years_experience_required, e.meets_experience_requirement,
-                e.key_matches, e.missing_requirements, e.experience_analysis,
                 e.evaluation_date, e.evaluation_data,
                 j.title as job_title
             FROM evaluations e

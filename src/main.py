@@ -411,9 +411,9 @@ def show_evaluation():
                     'candidate_name': eval_record[3],
                     'candidate_email': eval_record[4],
                     'candidate_phone': eval_record[5],
+                    'result': str(eval_record[6]),
                     'job_title': eval_record[15],
-                    'result': str(eval_record[6]),  # Ensure result is a string
-                    'match_score': float(eval_record[8]) if eval_record[8] is not None else 0.0,  # Ensure match_score is a float
+                    'match_score': float(eval_record[8]) if eval_record[8] is not None else 0.0,
                     'evaluation_date': eval_record[13]
                 }
 

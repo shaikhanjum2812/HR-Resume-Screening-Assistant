@@ -304,31 +304,37 @@ def show_evaluation():
         # Get evaluations data
         evaluations = db.get_evaluations_by_period(period.lower())
 
-        if not evaluations:
-            st.info("No evaluations found for the selected period.")
-        else:
-            # Create a DataFrame for better display
-            eval_data = []
-            for eval_record in evaluations:
+        # Create a DataFrame for better display
+        eval_data = []
+        for eval_record in evaluations:
+            try:
                 eval_data.append({
                     'Date': eval_record[13],  # evaluation_date
                     'Resume': eval_record[2],  # resume_name
-                    'Job Title': eval_record[-1],  # job title
+                    'Job Title': eval_record[15],  # job_title from JOIN
                     'Decision': eval_record[3],  # result
-                    'Match Score': f"{float(eval_record[5])*100:.1f}%",  # match_score
+                    'Match Score': f"{float(eval_record[5])*100:.1f}%" if eval_record[5] is not None else "N/A",  # match_score
                     'ID': eval_record[0]  # evaluation id
                 })
+            except (IndexError, TypeError) as e:
+                st.error(f"Error processing evaluation record: {str(e)}")
+                continue
 
-            df = pd.DataFrame(eval_data)
+        if not eval_data:
+            st.info("No evaluations found for the selected period.")
+            return
 
-            # Display table with expandable rows
-            for idx, row in df.iterrows():
-                with st.expander(
-                    f"{row['Date']} - {row['Resume']} ({row['Job Title']}) - {row['Decision'].upper()}"
-                ):
-                    # Retrieve full evaluation details
-                    details = db.get_evaluation_details(row['ID'])
-                    if details:  # Add null check
+        df = pd.DataFrame(eval_data)
+
+        # Display table with expandable rows
+        for idx, row in df.iterrows():
+            with st.expander(
+                f"{row['Date']} - {row['Resume']} ({row['Job Title']}) - {row['Decision'].upper()}"
+            ):
+                # Retrieve full evaluation details
+                details = db.get_evaluation_details(row['ID'])
+                if details:  # Add null check
+                    try:
                         # Display detailed information
                         col1, col2 = st.columns(2)
                         with col1:
@@ -357,8 +363,10 @@ def show_evaluation():
                             st.write("**Missing Requirements:**")
                             for req in details['missing_requirements']:
                                 st.write("✗", req)
-                    else:
-                        st.warning("Detailed evaluation data not available for this record.")
+                    except Exception as e:
+                        st.error(f"Error displaying evaluation details: {str(e)}")
+                else:
+                    st.warning("Detailed evaluation data not available for this record.")
 
 
 def show_analytics():

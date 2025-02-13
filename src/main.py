@@ -2,18 +2,34 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import os
-import json # added for json download
+import json
 from database import Database
 from ai_evaluator import AIEvaluator
 from pdf_processor import PDFProcessor
 from analytics import Analytics
 from utils import extract_text_from_upload
 
-# Initialize components
-db = Database()
-ai_evaluator = AIEvaluator()
-pdf_processor = PDFProcessor()
-analytics = Analytics()
+# Initialize components with debug logging
+st.write("Initializing components...")
+
+try:
+    db = Database()
+    st.write("Database connection established")
+except Exception as e:
+    st.error(f"Failed to connect to database: {str(e)}")
+
+try:
+    ai_evaluator = AIEvaluator()
+    st.write("AI Evaluator initialized")
+except Exception as e:
+    st.error(f"Failed to initialize AI Evaluator: {str(e)}")
+
+try:
+    pdf_processor = PDFProcessor()
+    analytics = Analytics()
+    st.write("PDF Processor and Analytics initialized")
+except Exception as e:
+    st.error(f"Failed to initialize other components: {str(e)}")
 
 def init_session_state():
     if 'page' not in st.session_state:
@@ -295,14 +311,6 @@ def show_evaluation():
 
     with tab2:
         st.subheader("Evaluations")
-
-        # # Add clear evaluations button (temporarily hidden)
-        # if st.button("🗑️ Clear All Evaluation Records", type="secondary"):
-        #     if db.clear_evaluations():
-        #         st.success("All evaluation records have been cleared successfully!")
-        #         st.rerun()
-        #     else:
-        #         st.error("Failed to clear evaluation records. Please try again.")
 
         # Period filter
         col1, col2 = st.columns([2, 3])

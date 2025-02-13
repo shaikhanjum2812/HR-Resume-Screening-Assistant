@@ -12,8 +12,42 @@ class AIEvaluator:
             )
         self.client = OpenAI(api_key=api_key)
 
+    def extract_candidate_info(self, resume_text: str) -> Dict[str, str]:
+        """Extract candidate's personal information from resume."""
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """Extract candidate's personal information from the resume.
+                        Return a JSON object with the following format:
+                        {
+                            "name": "full name of candidate",
+                            "email": "email address",
+                            "phone": "phone number"
+                        }
+                        If any field is not found, set it to null."""
+                    },
+                    {
+                        "role": "user",
+                        "content": resume_text
+                    }
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.3
+            )
+
+            return json.loads(response.choices[0].message.content)
+        except Exception as e:
+            print(f"Error extracting candidate info: {str(e)}")
+            return {"name": None, "email": None, "phone": None}
+
     def evaluate_resume(self, resume_text: str, job_description: str, evaluation_criteria: dict = None) -> Dict[str, Union[str, float, List[str]]]:
         try:
+            # Extract candidate information first
+            candidate_info = self.extract_candidate_info(resume_text)
+
             # Build dynamic system message based on evaluation criteria
             system_message = """You are an expert HR assistant with strict evaluation criteria."""
 
@@ -70,7 +104,7 @@ class AIEvaluator:
             }"""
 
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4",
                 messages=[
                     {
                         "role": "system",
@@ -87,6 +121,9 @@ class AIEvaluator:
             )
 
             result = json.loads(response.choices[0].message.content)
+
+            # Add candidate information to the result
+            result['candidate_info'] = candidate_info
 
             # Validate response format
             required_keys = ['decision', 'justification', 'match_score', 'key_matches', 

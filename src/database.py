@@ -38,12 +38,15 @@ class Database:
         )
         ''')
 
-        # Evaluations table
+        # Updated Evaluations table with candidate information
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS evaluations (
             id SERIAL PRIMARY KEY,
             job_id INTEGER REFERENCES job_descriptions(id),
             resume_name TEXT NOT NULL,
+            candidate_name TEXT,
+            candidate_email TEXT,
+            candidate_phone TEXT,
             result TEXT NOT NULL,
             justification TEXT NOT NULL,
             match_score FLOAT,
@@ -126,15 +129,18 @@ class Database:
         cursor = self.conn.cursor()
         cursor.execute('''
             INSERT INTO evaluations (
-                job_id, resume_name, result, justification,
-                match_score, years_experience_total, years_experience_relevant,
-                years_experience_required, meets_experience_requirement,
-                key_matches, missing_requirements, experience_analysis,
-                evaluation_data
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                job_id, resume_name, candidate_name, candidate_email, candidate_phone,
+                result, justification, match_score, years_experience_total,
+                years_experience_relevant, years_experience_required,
+                meets_experience_requirement, key_matches, missing_requirements,
+                experience_analysis, evaluation_data
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ''', (
             job_id,
             resume_name,
+            evaluation_result.get('candidate_info', {}).get('name', ''),
+            evaluation_result.get('candidate_info', {}).get('email', ''),
+            evaluation_result.get('candidate_info', {}).get('phone', ''),
             evaluation_result['decision'],
             evaluation_result['justification'],
             evaluation_result['match_score'],

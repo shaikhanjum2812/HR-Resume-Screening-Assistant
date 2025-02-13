@@ -351,20 +351,36 @@ def show_evaluation():
                 eval_data = {
                     'id': eval_record[0],
                     'resume_name': eval_record[2],
+                    'candidate_name': eval_record[3],
+                    'candidate_email': eval_record[4],
+                    'candidate_phone': eval_record[5],
                     'job_title': eval_record[15],
-                    'result': eval_record[3],
-                    'match_score': eval_record[5],
+                    'result': eval_record[6],
+                    'match_score': eval_record[8],
                     'evaluation_date': eval_record[13]
                 }
 
-                # Apply search filter
-                if search_term.lower() not in eval_data['resume_name'].lower() and \
-                   search_term.lower() not in eval_data['job_title'].lower():
+                # Apply search filter (now includes candidate name)
+                if (search_term.lower() not in (eval_data['candidate_name'] or '').lower() and
+                    search_term.lower() not in eval_data['job_title'].lower()):
                     continue
 
-                # Create card for each evaluation
-                with st.expander(f"📄 Candidate: {eval_data['resume_name']} | Position: {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
+                # Create card for each evaluation with candidate info
+                candidate_display = eval_data['candidate_name'] or eval_data['resume_name']
+                with st.expander(f"📄 Candidate: {candidate_display} | Position: {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
                     cols = st.columns([2, 1, 1])
+
+                    # Contact information section
+                    if eval_data['candidate_email'] or eval_data['candidate_phone']:
+                        st.write("#### Contact Information")
+                        contact_cols = st.columns(2)
+                        with contact_cols[0]:
+                            if eval_data['candidate_email']:
+                                st.write(f"📧 Email: {eval_data['candidate_email']}")
+                        with contact_cols[1]:
+                            if eval_data['candidate_phone']:
+                                st.write(f"📱 Phone: {eval_data['candidate_phone']}")
+                        st.markdown("---")
 
                     with cols[0]:
                         if eval_data['result'] == 'shortlist':
@@ -420,10 +436,6 @@ def show_evaluation():
             except Exception as e:
                 st.error(f"Error displaying evaluation: {str(e)}")
                 continue
-
-        # Handle row selection (removed, replaced by card system)
-
-        # Show modal with justification (removed, integrated into cards)
 
 
 def show_analytics():

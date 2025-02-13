@@ -206,7 +206,7 @@ def show_jobs():
 
             if st.button(f"Delete {job['title']}", key=f"del_{job['id']}"):
                 db.delete_job(job['id'])
-                st.experimental_rerun()
+                st.rerun()
 
 def show_evaluation():
     st.title("Resume Evaluation")
@@ -415,7 +415,7 @@ def show_evaluation():
                         if st.button("Close Details"):
                             st.session_state.show_justification = False
                             st.session_state.selected_eval = None
-                            st.experimental_rerun()
+                            st.rerun()
                     except Exception as e:
                         st.error(f"Error displaying evaluation details: {str(e)}")
                 else:
@@ -423,7 +423,7 @@ def show_evaluation():
                     if st.button("Close"):
                         st.session_state.show_justification = False
                         st.session_state.selected_eval = None
-                        st.experimental_rerun()
+                        st.rerun()
 
 def show_analytics():
     st.title("Analytics Dashboard")

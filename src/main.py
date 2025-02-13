@@ -426,7 +426,9 @@ def show_evaluation():
 
                 # Create card for each evaluation
                 display_name = eval_data['candidate_name'] if eval_data['candidate_name'] else f"Resume: {eval_data['resume_name']}"
-                with st.expander(f"👤 {display_name} - {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
+                decision = eval_data['result'].upper()
+                decision_icon = "✅" if decision == "SHORTLIST" else "❌"
+                with st.expander(f"{decision_icon} {display_name} - {decision} | {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
                     # Display candidate contact info if available
                     if eval_data['candidate_name'] or eval_data['candidate_email'] or eval_data['candidate_phone']:
                         st.write("#### Candidate Information")
@@ -442,11 +444,10 @@ def show_evaluation():
                     # Evaluation results
                     result_cols = st.columns([2, 1, 1])
                     with result_cols[0]:
-                        result = eval_data['result'].upper()
-                        if result == 'SHORTLIST':
-                            st.success(f"Decision: {result}")
+                        if decision == 'SHORTLIST':
+                            st.success(f"Decision: {decision}")
                         else:
-                            st.error(f"Decision: {result}")
+                            st.error(f"Decision: {decision}")
 
                     with result_cols[1]:
                         st.metric("Match Score", f"{eval_data['match_score']*100:.1f}%")

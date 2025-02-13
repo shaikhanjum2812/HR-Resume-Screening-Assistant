@@ -104,29 +104,71 @@ def show_jobs():
                     st.error(f"Failed to save job description: {str(e)}")
 
     else:  # File Upload
-        title = st.text_input("Job Title")
-        uploaded_file = st.file_uploader(
-            "Upload Job Description (PDF, DOCX, or TXT)",
-            type=['pdf', 'docx', 'txt']
-        )
+        with st.form("job_description_upload_form"):
+            title = st.text_input("Job Title")
+            uploaded_file = st.file_uploader(
+                "Upload Job Description (PDF, DOCX, or TXT)",
+                type=['pdf', 'docx', 'txt']
+            )
 
-        if uploaded_file is not None:
-            try:
-                if st.button("Save Uploaded Job Description"):
-                    if not title:
-                        st.error("Please provide a title for the job description.")
-                        return
+            # Evaluation Criteria Section
+            st.subheader("Evaluation Criteria")
+            col1, col2 = st.columns(2)
 
+            with col1:
+                min_years = st.number_input("Minimum Years of Experience", min_value=0, value=0)
+                required_skills = st.text_area(
+                    "Required Skills (one per line)",
+                    help="Enter each required skill on a new line"
+                )
+                education_req = st.text_area("Education Requirements")
+
+            with col2:
+                preferred_skills = st.text_area(
+                    "Preferred Skills (one per line)",
+                    help="Enter each preferred skill on a new line"
+                )
+                company_background = st.text_area("Company Background Requirements")
+                domain_experience = st.text_area("Domain Experience Requirements")
+
+            additional_instructions = st.text_area(
+                "Additional Evaluation Instructions",
+                help="Any specific instructions for the AI evaluator"
+            )
+
+            submit_button = st.form_submit_button("Save Job Description")
+
+            if submit_button:
+                if not title:
+                    st.error("Please provide a title for the job description.")
+                    return
+
+                if not uploaded_file:
+                    st.error("Please upload a job description file.")
+                    return
+
+                try:
                     description = extract_text_from_upload(uploaded_file)
                     if description:
-                        db.add_job_description(title, description)
-                        st.success("Job description uploaded and saved successfully!")
+                        # Prepare evaluation criteria
+                        evaluation_criteria = {
+                            'min_years_experience': min_years,
+                            'required_skills': [s.strip() for s in required_skills.split('\n') if s.strip()],
+                            'preferred_skills': [s.strip() for s in preferred_skills.split('\n') if s.strip()],
+                            'education_requirements': education_req,
+                            'company_background_requirements': company_background,
+                            'domain_experience_requirements': domain_experience,
+                            'additional_instructions': additional_instructions
+                        }
+
+                        db.add_job_description(title, description, evaluation_criteria)
+                        st.success("Job description uploaded and criteria saved successfully!")
                         st.subheader("Extracted Text Preview")
                         st.text_area("Preview", description, height=200, disabled=True)
                     else:
                         st.error("No text could be extracted from the file.")
-            except Exception as e:
-                st.error(f"Failed to process uploaded file: {str(e)}")
+                except Exception as e:
+                    st.error(f"Failed to process uploaded file: {str(e)}")
 
     # List existing job descriptions
     st.markdown("---")

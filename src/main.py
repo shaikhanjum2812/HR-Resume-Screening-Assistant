@@ -211,116 +211,152 @@ def show_jobs():
 def show_evaluation():
     st.title("Resume Evaluation")
 
-    # Job selection
-    jobs = db.get_all_jobs()
-    job_titles = [job['title'] for job in jobs]
-    selected_job = st.selectbox("Select Job Description", job_titles)
+    # Create tabs for new evaluation and past evaluations
+    tab1, tab2 = st.tabs(["New Evaluation", "Past Evaluations"])
 
-    # Resume upload
-    uploaded_file = st.file_uploader("Upload Resume (PDF)", type=['pdf'])
+    with tab1:
+        # Job selection
+        jobs = db.get_all_jobs()
+        job_titles = [job['title'] for job in jobs]
+        selected_job = st.selectbox("Select Job Description", job_titles)
 
-    if uploaded_file and selected_job:
-        if st.button("Evaluate Resume"):
-            with st.spinner("Processing resume..."):
-                # Extract text from PDF
-                resume_text = pdf_processor.extract_text(uploaded_file)
+        # Resume upload
+        uploaded_file = st.file_uploader("Upload Resume (PDF)", type=['pdf'])
 
-                # Get job description and criteria
-                job = next(job for job in jobs if job['title'] == selected_job)
-                criteria = db.get_evaluation_criteria(job['id']) if job['has_criteria'] else None
+        if uploaded_file and selected_job:
+            if st.button("Evaluate Resume"):
+                with st.spinner("Processing resume..."):
+                    # Extract text from PDF
+                    resume_text = pdf_processor.extract_text(uploaded_file)
 
-                # Evaluate with AI
-                evaluation = ai_evaluator.evaluate_resume(
-                    resume_text, 
-                    job['description'],
-                    evaluation_criteria=criteria
-                )
+                    # Get job description and criteria
+                    job = next(job for job in jobs if job['title'] == selected_job)
+                    criteria = db.get_evaluation_criteria(job['id']) if job['has_criteria'] else None
 
-                # Save complete evaluation results
-                db.save_evaluation(
-                    job_id=job['id'],
-                    resume_name=uploaded_file.name,
-                    evaluation_result=evaluation
-                )
+                    # Evaluate with AI
+                    evaluation = ai_evaluator.evaluate_resume(
+                        resume_text, 
+                        job['description'],
+                        evaluation_criteria=criteria
+                    )
 
-                # Display results
-                st.success("Evaluation Complete!")
+                    # Save complete evaluation results
+                    db.save_evaluation(
+                        job_id=job['id'],
+                        resume_name=uploaded_file.name,
+                        evaluation_result=evaluation
+                    )
 
-                # Decision with color coding
-                if evaluation['decision'] == 'shortlist':
-                    st.success(f"Decision: {evaluation['decision'].upper()}")
-                else:
-                    st.error(f"Decision: {evaluation['decision'].upper()}")
+                    # Display results
+                    st.success("Evaluation Complete!")
 
-                # SAP Experience Analysis
-                st.subheader("SAP Implementation Experience")
-                sap_exp = evaluation.get('sap_experience', {})
-                if sap_exp.get('has_implementation'):
-                    st.success("✓ Has SAP Implementation Experience")
-                else:
-                    st.error("✗ No SAP Implementation Experience")
+                    # Decision with color coding
+                    if evaluation['decision'] == 'shortlist':
+                        st.success(f"Decision: {evaluation['decision'].upper()}")
+                    else:
+                        st.error(f"Decision: {evaluation['decision'].upper()}")
 
-                st.write("**Implementation Details:**", sap_exp.get('details', 'No details available'))
+                    # Match score with progress bar
+                    st.subheader("Match Score")
+                    st.progress(float(evaluation['match_score']))
+                    st.write(f"Match Score: {evaluation['match_score']*100:.1f}%")
 
-                if sap_exp.get('projects'):
-                    st.write("**SAP Implementation Projects:**")
-                    for project in sap_exp['projects']:
-                        st.write("•", project)
+                    # Experience Analysis
+                    st.subheader("Experience Analysis")
+                    exp_data = evaluation['years_of_experience']
+                    cols = st.columns(3)
+                    with cols[0]:
+                        st.metric("Total Experience", f"{exp_data['total']} years")
+                    with cols[1]:
+                        st.metric("Relevant Experience", f"{exp_data['relevant']} years")
+                    with cols[2]:
+                        st.metric("Required Experience", f"{exp_data['required']} years")
 
-                # Company Background Analysis
-                st.subheader("Company Background")
-                comp_bg = evaluation.get('company_background', {})
-                if comp_bg.get('has_it_services'):
-                    st.success("✓ Has IT Services Company Experience")
-                else:
-                    st.error("✗ No IT Services Company Experience")
+                    # Detailed justification
+                    st.subheader("Evaluation Details")
+                    st.write("**Justification:**", evaluation['justification'])
 
-                if comp_bg.get('companies'):
-                    st.write("**Relevant Companies:**")
-                    for company in comp_bg['companies']:
-                        st.write("•", company)
+                    if 'experience_analysis' in evaluation:
+                        st.write("**Experience Analysis:**", evaluation['experience_analysis'])
 
-                if comp_bg.get('roles'):
-                    st.write("**Relevant Roles:**")
-                    for role in comp_bg['roles']:
-                        st.write("•", role)
+                    # Skills and Requirements
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write("**Matching Skills/Qualifications:**")
+                        for skill in evaluation['key_matches']:
+                            st.write("✓", skill)
 
-                # Experience Analysis
-                st.subheader("Experience Analysis")
-                exp_data = evaluation.get('years_of_experience', {})
-                cols = st.columns(4)
-                with cols[0]:
-                    st.metric("Total Experience", f"{exp_data.get('total', 0)} years")
-                with cols[1]:
-                    st.metric("Relevant Experience", f"{exp_data.get('relevant', 0)} years")
-                with cols[2]:
-                    st.metric("SAP Implementation", f"{exp_data.get('sap_implementation', 0)} years")
-                with cols[3]:
-                    st.metric("Required Experience", f"{exp_data.get('required', 0)} years")
+                    with col2:
+                        st.write("**Missing Requirements:**")
+                        for req in evaluation['missing_requirements']:
+                            st.write("✗", req)
 
-                # Detailed justification
-                st.subheader("Evaluation Details")
-                st.write("**Justification:**", evaluation['justification'])
+    with tab2:
+        st.subheader("Past Evaluations")
 
-                if 'experience_analysis' in evaluation:
-                    st.write("**Experience Relevance Analysis:**", evaluation['experience_analysis'])
+        # Time period filter
+        period = st.selectbox(
+            "Filter by time period",
+            ["Week", "Month", "Year", "All Time"],
+            key="eval_period"
+        )
 
-                # Match score with progress bar
-                st.subheader("Match Score")
-                st.progress(float(evaluation['match_score']))
-                st.write(f"Match Score: {evaluation['match_score']*100:.1f}%")
+        # Get evaluations data
+        evaluations = db.get_evaluations_by_period(period.lower())
 
-                # Skills and Requirements
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write("**Matching Skills/Qualifications:**")
-                    for skill in evaluation['key_matches']:
-                        st.write("✓", skill)
+        if not evaluations:
+            st.info("No evaluations found for the selected period.")
+        else:
+            # Create a DataFrame for better display
+            eval_data = []
+            for eval_record in evaluations:
+                eval_data.append({
+                    'Date': eval_record[13],  # evaluation_date
+                    'Resume': eval_record[2],  # resume_name
+                    'Job Title': eval_record[-1],  # job title
+                    'Decision': eval_record[3],  # result
+                    'Match Score': f"{float(eval_record[5])*100:.1f}%",  # match_score
+                    'ID': eval_record[0]  # evaluation id
+                })
 
-                with col2:
-                    st.write("**Missing Requirements:**")
-                    for req in evaluation['missing_requirements']:
-                        st.write("✗", req)
+            df = pd.DataFrame(eval_data)
+
+            # Display table with expandable rows
+            for idx, row in df.iterrows():
+                with st.expander(
+                    f"{row['Date']} - {row['Resume']} ({row['Job Title']}) - {row['Decision'].upper()}"
+                ):
+                    # Retrieve full evaluation details
+                    details = db.get_evaluation_details(row['ID'])
+
+                    # Display detailed information
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Match Score", row['Match Score'])
+                        st.write("**Decision:**", details['result'].upper())
+                        st.write("**Total Experience:**", f"{details['years_experience_total']} years")
+                        st.write("**Relevant Experience:**", f"{details['years_experience_relevant']} years")
+
+                    with col2:
+                        if details['meets_experience_requirement']:
+                            st.success("✓ Meets Experience Requirement")
+                        else:
+                            st.error("✗ Does Not Meet Experience Requirement")
+                        st.write("**Required Experience:**", f"{details['years_experience_required']} years")
+
+                    st.write("**Justification:**", details['justification'])
+                    st.write("**Experience Analysis:**", details['experience_analysis'])
+
+                    col3, col4 = st.columns(2)
+                    with col3:
+                        st.write("**Matching Skills:**")
+                        for skill in details['key_matches']:
+                            st.write("✓", skill)
+
+                    with col4:
+                        st.write("**Missing Requirements:**")
+                        for req in details['missing_requirements']:
+                            st.write("✗", req)
 
 def show_analytics():
     st.title("Analytics Dashboard")

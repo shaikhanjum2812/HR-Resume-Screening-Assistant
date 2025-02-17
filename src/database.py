@@ -331,26 +331,28 @@ class Database:
         return None
 
     def get_evaluation_details(self, evaluation_id):
+        """Retrieve detailed evaluation data by ID"""
         query = '''
             SELECT * FROM evaluations WHERE id = %s
         '''
-        eval_data = self.execute_query(query, (evaluation_id,),cursor_factory=psycopg2.extras.DictCursor)
-        if eval_data:
+        eval_data = self.execute_query(query, (evaluation_id,), cursor_factory=psycopg2.extras.DictCursor)
+        if eval_data and len(eval_data) > 0:
+            row = eval_data[0]  # Get the first row since we're querying by ID
             return {
-                'id': eval_data[0]['id'],
-                'job_id': eval_data[0]['job_id'],
-                'resume_name': eval_data[0]['resume_name'],
-                'result': eval_data[0]['result'],
-                'justification': eval_data[0]['justification'],
-                'match_score': eval_data[0]['match_score'],
-                'years_experience_total': eval_data[0]['years_experience_total'],
-                'years_experience_relevant': eval_data[0]['years_experience_relevant'],
-                'years_experience_required': eval_data[0]['years_experience_required'],
-                'meets_experience_requirement': eval_data[0]['meets_experience_requirement'],
-                'key_matches': json.loads(eval_data[0]['key_matches']),
-                'missing_requirements': json.loads(eval_data[0]['missing_requirements']),
-                'experience_analysis': eval_data[0]['experience_analysis'],
-                'evaluation_date': eval_data[0]['evaluation_date'],
-                'evaluation_data': json.loads(eval_data[0]['evaluation_data'])
+                'id': row['id'],
+                'job_id': row['job_id'],
+                'resume_name': row['resume_name'],
+                'result': row['result'],
+                'justification': row['justification'],
+                'match_score': row['match_score'],
+                'years_experience_total': row['years_experience_total'],
+                'years_experience_relevant': row['years_experience_relevant'],
+                'years_experience_required': row['years_experience_required'],
+                'meets_experience_requirement': row['meets_experience_requirement'],
+                'key_matches': json.loads(row['key_matches']),
+                'missing_requirements': json.loads(row['missing_requirements']),
+                'experience_analysis': row['experience_analysis'],
+                'evaluation_date': row['evaluation_date'],
+                'evaluation_data': json.loads(row['evaluation_data'])
             }
         return None

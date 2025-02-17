@@ -150,16 +150,20 @@ def show_evaluation():
 
     selected_job = st.selectbox("Select Job Description", job_titles)
 
-    # Resume upload
-    st.write("Upload Resumes (PDF files will be processed one at a time)")
+    # Resume upload with max limit warning
+    st.write("Upload Resumes (Maximum 5 resumes can be uploaded at a time)")
     uploaded_files = st.file_uploader(
         "Upload Resumes (PDF)",
         type=['pdf'],
         accept_multiple_files=True
     )
 
-    if uploaded_files and selected_job:
-        if st.button("Start Evaluation"):
+    if uploaded_files:
+        if len(uploaded_files) > 5:
+            st.error("Please upload a maximum of 5 resumes at a time.")
+            return
+
+        if selected_job and st.button("Start Evaluation"):
             # Get job description and criteria
             job = next(job for job in jobs if job['title'] == selected_job)
             criteria = st.session_state.components['db'].get_evaluation_criteria(job['id']) if job['has_criteria'] else None

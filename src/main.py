@@ -8,10 +8,11 @@ import json
 from database import Database
 from ai_evaluator import AIEvaluator
 from pdf_processor import PDFProcessor
-from docx_processor import DOCXProcessor  # Add import
+from docx_processor import DOCXProcessor
 from analytics import Analytics
 from utils import extract_text_from_upload
 from report_generator import generate_evaluation_report
+from theme_config import initialize_theme, apply_theme, COLOR_SCHEMES
 
 # Configure logging
 logging.basicConfig(
@@ -566,14 +567,38 @@ def init_session_state():
         st.session_state.page = 'home'
     if 'components' not in st.session_state:
         st.session_state.components = None
+    if 'theme' not in st.session_state:
+        st.session_state.theme = list(COLOR_SCHEMES.keys())[0] #default theme
+
 
 def sidebar():
     st.sidebar.title("HR Assistant")
+
+    # Add theme selector to sidebar
+    initialize_theme()
+    st.sidebar.write("---")
+    st.sidebar.subheader("Color Theme")
+    selected_theme = st.sidebar.selectbox(
+        "Choose Theme",
+        list(COLOR_SCHEMES.keys()),
+        index=list(COLOR_SCHEMES.keys()).index(st.session_state.theme)
+    )
+
+    if selected_theme != st.session_state.theme:
+        st.session_state.theme = selected_theme
+        st.rerun()
+
+    # Apply the selected theme
+    apply_theme(st.session_state.theme)
+
+    st.sidebar.write("---")
+
+    # Original navigation menu
     pages = {
         'Home': 'home',
         'Job Descriptions': 'jobs',
         'Resume Evaluation': 'evaluation',
-        'Past Evaluations': 'past_evaluations',  # Add new page
+        'Past Evaluations': 'past_evaluations',
         'Analytics': 'analytics'
     }
 

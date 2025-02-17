@@ -415,24 +415,26 @@ def show_past_evaluations():
                     # Download buttons
                     col1, col2 = st.columns(2)
                     with col1:
-                        # Download evaluation report
+                        # Download evaluation report with unique key
                         evaluation_json = json.dumps(detailed_eval['evaluation_data'], indent=2)
                         st.download_button(
                             label="📄 Download Evaluation Report",
                             data=evaluation_json,
                             file_name=f"evaluation_{resume_name}_{evaluation_date:%Y%m%d}.json",
-                            mime="application/json"
+                            mime="application/json",
+                            key=f"eval_report_{eval_id}"  # Added unique key
                         )
 
                     with col2:
-                        # Download original resume
+                        # Download original resume with unique key
                         resume_file = st.session_state.components['db'].get_resume_file(eval_id)
                         if resume_file:
                             st.download_button(
                                 label="📥 Download Original Resume",
                                 data=resume_file['file_data'],
                                 file_name=resume_file['file_name'],
-                                mime=resume_file['file_type']
+                                mime=resume_file['file_type'],
+                                key=f"resume_{eval_id}"  # Added unique key
                             )
 
                     # Display detailed metrics

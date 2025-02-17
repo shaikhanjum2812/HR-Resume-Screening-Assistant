@@ -377,12 +377,15 @@ def show_analytics():
 def show_past_evaluations():
     st.title("Past Evaluations")
 
-    # Add period filter
-    period = st.selectbox("Time Period", ["Week", "Month", "Quarter", "Year"], key="eval_period")
+    # Add period filter with updated options
+    period = st.selectbox("Time Period", ["Last week", "Last month"], key="eval_period")
 
     try:
+        # Convert friendly names to database period values
+        period_value = period.lower().replace("last ", "")
+
         # Get evaluations for the selected period
-        evaluations = st.session_state.components['db'].get_evaluations_by_period(period.lower())
+        evaluations = st.session_state.components['db'].get_evaluations_by_period(period_value)
 
         if not evaluations:
             st.info("No evaluations found for the selected period.")

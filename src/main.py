@@ -374,6 +374,84 @@ def show_analytics():
     st.subheader("Job-wise Distribution")
     st.plotly_chart(st.session_state.components['analytics'].plot_job_distribution())
 
+def show_past_evaluations():
+    st.title("Past Evaluations")
+
+    # Add period filter
+    period = st.selectbox("Time Period", ["Week", "Month", "Quarter", "Year"], key="eval_period")
+
+    try:
+        # Get evaluations for the selected period
+        evaluations = st.session_state.components['db'].get_evaluations_by_period(period.lower())
+
+        if not evaluations:
+            st.info("No evaluations found for the selected period.")
+            return
+
+        # Display evaluations in an expandable format
+        for eval_data in evaluations:
+            eval_id = eval_data[0]
+            resume_name = eval_data[2]
+            candidate_name = eval_data[3] or "N/A"
+            result = eval_data[6]
+            match_score = eval_data[8]
+            evaluation_date = eval_data[13]
+            job_title = eval_data[15]
+
+            # Create an expander for each evaluation
+            with st.expander(f"{candidate_name} - {job_title} ({evaluation_date:%Y-%m-%d})"):
+                # Display basic information
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Match Score", f"{match_score*100:.1f}%")
+                with col2:
+                    st.metric("Decision", result)
+                with col3:
+                    st.metric("Resume", resume_name)
+
+                # Get detailed evaluation data
+                detailed_eval = st.session_state.components['db'].get_evaluation_details(eval_id)
+                if detailed_eval:
+                    # Download buttons
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        # Download evaluation report
+                        evaluation_json = json.dumps(detailed_eval['evaluation_data'], indent=2)
+                        st.download_button(
+                            label="📄 Download Evaluation Report",
+                            data=evaluation_json,
+                            file_name=f"evaluation_{resume_name}_{evaluation_date:%Y%m%d}.json",
+                            mime="application/json"
+                        )
+
+                    with col2:
+                        # Download original resume
+                        resume_file = st.session_state.components['db'].get_resume_file(eval_id)
+                        if resume_file:
+                            st.download_button(
+                                label="📥 Download Original Resume",
+                                data=resume_file['file_data'],
+                                file_name=resume_file['file_name'],
+                                mime=resume_file['file_type']
+                            )
+
+                    # Display detailed metrics
+                    st.write("#### Evaluation Details")
+                    st.write("**Key Matches:**")
+                    for skill in detailed_eval['key_matches'].get('skills', []):
+                        st.write(f"- {skill}")
+
+                    st.write("**Missing Requirements:**")
+                    for req in detailed_eval['missing_requirements']:
+                        st.write(f"- {req}")
+
+                    st.write("**Experience Analysis:**")
+                    st.write(detailed_eval['experience_analysis'])
+
+    except Exception as e:
+        st.error(f"Error loading evaluations: {str(e)}")
+        logger.error(f"Error in show_past_evaluations: {str(e)}")
+
 def init_session_state():
     if 'page' not in st.session_state:
         st.session_state.page = 'home'
@@ -386,6 +464,7 @@ def sidebar():
         'Home': 'home',
         'Job Descriptions': 'jobs',
         'Resume Evaluation': 'evaluation',
+        'Past Evaluations': 'past_evaluations',  # Add new page
         'Analytics': 'analytics'
     }
 
@@ -423,6 +502,8 @@ def main():
             show_jobs()
         elif st.session_state.page == 'evaluation':
             show_evaluation()
+        elif st.session_state.page == 'past_evaluations':  # Add new page routing
+            show_past_evaluations()
         elif st.session_state.page == 'analytics':
             show_analytics()
 

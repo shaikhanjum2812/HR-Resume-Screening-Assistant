@@ -377,19 +377,40 @@ def show_analytics():
 def show_past_evaluations():
     st.title("Past Evaluations")
 
-    # Add period filter with updated options
-    period = st.selectbox("Time Period", ["Last week", "Last month"], key="eval_period")
+    # Filter type selection
+    filter_type = st.radio("Select Filter Type", ["Preset Periods", "Custom Date Range"], horizontal=True)
 
     try:
-        # Convert friendly names to database period values
-        period_value = period.lower().replace("last ", "")
+        if filter_type == "Preset Periods":
+            # Add period filter with updated options
+            period = st.selectbox("Time Period", ["Last week", "Last month"], key="eval_period")
+            # Convert friendly names to database period values
+            period_value = period.lower().replace("last ", "")
 
-        # Get evaluations for the selected period
-        evaluations = st.session_state.components['db'].get_evaluations_by_period(period_value)
+            # Get evaluations for the selected period
+            evaluations = st.session_state.components['db'].get_evaluations_by_period(period_value)
 
-        if not evaluations:
-            st.info("No evaluations found for the selected period.")
-            return
+            if not evaluations:
+                st.info("No evaluations found for the selected period.")
+                return
+        else:
+            # Custom date range selection
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Start Date", value=datetime.now() - timedelta(days=7))
+            with col2:
+                end_date = st.date_input("End Date", value=datetime.now())
+
+            if start_date > end_date:
+                st.error("Start date must be before end date")
+                return
+
+            # Get evaluations for custom date range
+            evaluations = st.session_state.components['db'].get_evaluations_by_date_range(start_date, end_date)
+
+            if not evaluations:
+                st.info("No evaluations found for the selected date range.")
+                return
 
         # Display evaluations in an expandable format
         for eval_data in evaluations:
@@ -418,7 +439,7 @@ def show_past_evaluations():
                     # Download buttons
                     col1, col2 = st.columns(2)
                     with col1:
-                        # Download evaluation report with unique key
+                        # Download evaluation report
                         if 'evaluation_data' in detailed_eval:
                             evaluation_json = json.dumps(detailed_eval['evaluation_data'], indent=2)
                             st.download_button(
@@ -430,7 +451,7 @@ def show_past_evaluations():
                             )
 
                     with col2:
-                        # Download original resume with unique key
+                        # Download original resume
                         resume_file = st.session_state.components['db'].get_resume_file(eval_id)
                         if resume_file and isinstance(resume_file, dict):
                             st.download_button(

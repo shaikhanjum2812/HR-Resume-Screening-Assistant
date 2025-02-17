@@ -1,23 +1,23 @@
 import os
-from datetime import datetime
 import json
+import logging
+from datetime import datetime
 import psycopg2
 from psycopg2.pool import SimpleConnectionPool
 from psycopg2.extras import DictCursor
-import logging
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
 class Database:
     def __init__(self):
+        """Initialize the Database with connection pool"""
         try:
             # Create a connection pool instead of a single connection
             self.pool = SimpleConnectionPool(
                 minconn=1,
                 maxconn=10,
-                dsn=os.environ['DATABASE_URL'],
-                connect_timeout=3
+                dsn=os.environ['DATABASE_URL']
             )
             self.create_tables()
             logger.info("Database connection and tables initialized successfully")
@@ -28,35 +28,11 @@ class Database:
     @contextmanager
     def get_connection(self):
         """Context manager for database connections"""
-        conn = None
+        conn = self.pool.getconn()
         try:
-            conn = self.pool.getconn()
             yield conn
-        except Exception as e:
-            logger.error(f"Error with database connection: {e}")
-            if conn:
-                conn.rollback()
-            raise
         finally:
-            if conn:
-                self.pool.putconn(conn)
-
-    def execute_query(self, query, params=None, fetch=True, cursor_factory=None):
-        """Execute a query with proper connection handling"""
-        with self.get_connection() as conn:
-            with conn.cursor(cursor_factory=cursor_factory) as cursor:
-                try:
-                    cursor.execute(query, params or ())
-                    if fetch:
-                        result = cursor.fetchall()
-                    else:
-                        result = None
-                    conn.commit()
-                    return result
-                except Exception as e:
-                    logger.error(f"Query execution error: {e}")
-                    conn.rollback()
-                    raise
+            self.pool.putconn(conn)
 
     def create_tables(self):
         """Create necessary database tables if they don't exist"""
@@ -109,20 +85,8 @@ class Database:
                         key_matches TEXT,
                         missing_requirements TEXT,
                         experience_analysis TEXT,
-                        technical_skills_score FLOAT,
-                        experience_relevance_score FLOAT,
-                        education_match_score FLOAT,
-                        overall_fit_score FLOAT,
-                        interview_focus TEXT,
-                        skill_gaps TEXT,
-                        technical_depth FLOAT,
-                        problem_solving_score FLOAT,
-                        project_complexity_score FLOAT,
-                        implementation_experience_score FLOAT,
-                        project_expertise_score FLOAT,
-                        experience_quality_score FLOAT,
+                        evaluation_data JSONB,
                         evaluation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        evaluation_data TEXT,
                         resume_file_data BYTEA,
                         resume_file_type VARCHAR(255)
                     )
@@ -132,6 +96,23 @@ class Database:
                     logger.info("Database tables created successfully")
                 except Exception as e:
                     logger.error(f"Error creating tables: {e}")
+                    conn.rollback()
+                    raise
+
+    def execute_query(self, query, params=None, fetch=True, cursor_factory=None):
+        """Execute a query with proper connection handling"""
+        with self.get_connection() as conn:
+            with conn.cursor(cursor_factory=cursor_factory) as cursor:
+                try:
+                    cursor.execute(query, params or ())
+                    if fetch:
+                        result = cursor.fetchall()
+                    else:
+                        result = None
+                    conn.commit()
+                    return result
+                except Exception as e:
+                    logger.error(f"Query execution error: {e}")
                     conn.rollback()
                     raise
 
@@ -193,24 +174,26 @@ class Database:
         return job_id
 
     def get_all_jobs(self):
-        query = '''
-            SELECT j.id, j.title, j.description, j.date_created, e.id
-            FROM job_descriptions j
-            LEFT JOIN evaluation_criteria e ON j.id = e.job_id
-            WHERE j.active = true
-        '''
-        jobs = self.execute_query(query)
-        return [
-            {
-                'id': job[0],
-                'title': job[1],
-                'description': job[2],
-                'date_created': job[3],
-                'has_criteria': job[4] is not None
-            }
-            for job in jobs
-        ]
-
+        """Get all active jobs"""
+        with self.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute('''
+                    SELECT j.id, j.title, j.description, j.date_created, 
+                           EXISTS(SELECT 1 FROM evaluation_criteria e WHERE e.job_id = j.id) as has_criteria
+                    FROM job_descriptions j
+                    WHERE j.active = true
+                ''')
+                jobs = cursor.fetchall()
+                return [
+                    {
+                        'id': job[0],
+                        'title': job[1],
+                        'description': job[2],
+                        'date_created': job[3],
+                        'has_criteria': job[4]
+                    }
+                    for job in jobs
+                ]
 
     def delete_job(self, job_id):
         query = 'UPDATE job_descriptions SET active = false WHERE id = %s'

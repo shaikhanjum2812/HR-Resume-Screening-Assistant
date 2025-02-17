@@ -12,63 +12,158 @@ from analytics import Analytics
 from utils import extract_text_from_upload
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 def initialize_components():
     """Initialize all required components with proper error handling"""
-    components = {}
-
-    logger.info("Starting component initialization...")
-
     try:
         logger.info("Initializing database connection...")
-        components['db'] = Database()
+        db = Database()
         logger.info("Database connection successful")
-    except Exception as e:
-        logger.error(f"Failed to connect to database: {str(e)}")
-        st.error(f"Failed to connect to database: {str(e)}")
-        return None
 
-    try:
         logger.info("Initializing AI Evaluator...")
-        components['ai_evaluator'] = AIEvaluator()
+        ai_evaluator = AIEvaluator()
         logger.info("AI Evaluator initialization successful")
-    except Exception as e:
-        logger.error(f"Failed to initialize AI Evaluator: {str(e)}")
-        st.error(f"Failed to initialize AI Evaluator: {str(e)}")
-        return None
 
-    try:
         logger.info("Initializing PDF Processor and Analytics...")
-        components['pdf_processor'] = PDFProcessor()
-        components['analytics'] = Analytics()
+        pdf_processor = PDFProcessor()
+        analytics = Analytics()
         logger.info("PDF Processor and Analytics initialization successful")
+
+        return {
+            'db': db,
+            'ai_evaluator': ai_evaluator,
+            'pdf_processor': pdf_processor,
+            'analytics': analytics
+        }
     except Exception as e:
-        logger.error(f"Failed to initialize other components: {str(e)}")
-        st.error(f"Failed to initialize other components: {str(e)}")
+        logger.error(f"Failed to initialize components: {str(e)}")
         return None
 
-    logger.info("All components initialized successfully")
-    return components
+def process_single_resume(resume_file, job_description, evaluation_criteria, components):
+    """Process a single resume and show results"""
+    try:
+        # Extract text from PDF
+        resume_text = components['pdf_processor'].extract_text(resume_file)
 
-def init_session_state():
-    if 'page' not in st.session_state:
-        st.session_state.page = 'home'
-    if 'components' not in st.session_state:
-        st.session_state.components = None
+        # Evaluate with AI
+        evaluation = components['ai_evaluator'].evaluate_resume(
+            resume_text,
+            job_description,
+            evaluation_criteria=evaluation_criteria
+        )
 
-def sidebar():
-    st.sidebar.title("HR Assistant")
-    pages = {
-        'Home': 'home',
-        'Job Descriptions': 'jobs',
-        'Resume Evaluation': 'evaluation',
-        'Analytics': 'analytics'
-    }
+        # Save evaluation results
+        components['db'].save_evaluation(
+            job_id=job_description['id'],
+            resume_name=resume_file.name,
+            evaluation_result=evaluation,
+            resume_file=resume_file
+        )
 
-    selection = st.sidebar.radio("Navigate", list(pages.keys()))
-    st.session_state.page = pages[selection]
+        # Display result
+        st.subheader(f"Results for {resume_file.name}")
+
+        # Candidate Information
+        st.write("#### Candidate Information")
+        candidate_info = evaluation.get('candidate_info', {})
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.write("**Name:**", candidate_info.get('name', 'Not found'))
+        with col2:
+            st.write("**Email:**", candidate_info.get('email', 'Not found'))
+        with col3:
+            st.write("**Phone:**", candidate_info.get('phone', 'Not found'))
+
+        # Decision with color coding
+        result = evaluation.get('decision', '').upper()
+        if result == 'SHORTLIST':
+            st.success(f"Decision: {result}")
+        else:
+            st.error(f"Decision: {result}")
+
+        # Match score
+        match_score = float(evaluation.get('match_score', 0))
+        st.write(f"Match Score: {match_score*100:.1f}%")
+        st.progress(match_score)
+
+        # Experience Analysis
+        st.write("#### Experience Analysis")
+        exp_data = evaluation.get('years_of_experience', {})
+        cols = st.columns(3)
+        with cols[0]:
+            st.metric("Total Experience", f"{exp_data.get('total', 0)} years")
+        with cols[1]:
+            st.metric("Relevant Experience", f"{exp_data.get('relevant', 0)} years")
+        with cols[2]:
+            st.metric("Required Experience", f"{exp_data.get('required', 0)} years")
+
+        # Download buttons
+        st.write("#### Download Options")
+        col1, col2 = st.columns(2)
+        with col1:
+            evaluation_json = json.dumps(evaluation, indent=2)
+            st.download_button(
+                label="📄 Download Evaluation Report",
+                data=evaluation_json,
+                file_name=f"evaluation_{resume_file.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json"
+            )
+        with col2:
+            st.download_button(
+                label="📥 Download Original Resume",
+                data=resume_file.getvalue(),
+                file_name=resume_file.name,
+                mime=resume_file.type
+            )
+
+        st.markdown("---")
+        return True
+
+    except Exception as e:
+        st.error(f"Error processing {resume_file.name}: {str(e)}")
+        logger.error(f"Error processing resume: {str(e)}")
+        return False
+
+def show_evaluation():
+    st.title("Resume Evaluation")
+
+    # Job selection
+    jobs = st.session_state.components['db'].get_all_jobs()
+    job_titles = [job['title'] for job in jobs]
+
+    if not job_titles:
+        st.warning("Please add job descriptions first.")
+        return
+
+    selected_job = st.selectbox("Select Job Description", job_titles)
+
+    # Resume upload
+    st.write("Upload Resumes (PDF files will be processed one at a time)")
+    uploaded_files = st.file_uploader(
+        "Upload Resumes (PDF)",
+        type=['pdf'],
+        accept_multiple_files=True
+    )
+
+    if uploaded_files and selected_job:
+        if st.button("Start Evaluation"):
+            # Get job description and criteria
+            job = next(job for job in jobs if job['title'] == selected_job)
+            criteria = st.session_state.components['db'].get_evaluation_criteria(job['id']) if job['has_criteria'] else None
+
+            # Process each resume sequentially
+            success_count = 0
+            for idx, uploaded_file in enumerate(uploaded_files, 1):
+                st.write(f"Processing resume {idx} of {len(uploaded_files)}: {uploaded_file.name}")
+                if process_single_resume(uploaded_file, job, criteria, st.session_state.components):
+                    success_count += 1
+
+            st.success(f"Completed processing {success_count} out of {len(uploaded_files)} resumes!")
 
 def show_home():
     st.title("HR Assistant Dashboard")
@@ -254,285 +349,6 @@ def show_jobs():
                 st.session_state.components['db'].delete_job(job['id'])
                 st.rerun()
 
-def show_evaluation():
-    st.title("Resume Evaluation")
-
-    # Create tabs for new evaluation and evaluations list
-    tab1, tab2 = st.tabs(["New Evaluation", "Evaluations"])
-
-    with tab1:
-        # Job selection
-        jobs = st.session_state.components['db'].get_all_jobs()
-        job_titles = [job['title'] for job in jobs]
-        selected_job = st.selectbox("Select Job Description", job_titles)
-
-        # Multiple resume upload
-        st.write("Upload Resumes (Maximum 5 files)")
-        uploaded_files = st.file_uploader("Upload Resumes (PDF)", type=['pdf'], accept_multiple_files=True)
-
-        if uploaded_files and selected_job:
-            if len(uploaded_files) > 5:
-                st.error("Please upload a maximum of 5 resumes at a time.")
-                return
-
-            if st.button("Evaluate Resumes"):
-                # Get job description and criteria
-                job = next(job for job in jobs if job['title'] == selected_job)
-                criteria = st.session_state.components['db'].get_evaluation_criteria(job['id']) if job['has_criteria'] else None
-
-                # Create a progress bar
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-
-                # Container for results
-                results_container = st.container()
-
-                for index, uploaded_file in enumerate(uploaded_files):
-                    try:
-                        # Update progress
-                        progress = (index + 1) / len(uploaded_files)
-                        progress_bar.progress(progress)
-                        status_text.text(f"Processing {uploaded_file.name}... ({index + 1}/{len(uploaded_files)})")
-
-                        with st.spinner(f"Processing {uploaded_file.name}..."):
-                            # Extract text from PDF
-                            resume_text = st.session_state.components['pdf_processor'].extract_text(uploaded_file)
-
-                            # Evaluate with AI
-                            evaluation = st.session_state.components['ai_evaluator'].evaluate_resume(
-                                resume_text,
-                                job['description'],
-                                evaluation_criteria=criteria
-                            )
-
-                            # Save evaluation results
-                            st.session_state.components['db'].save_evaluation(
-                                job_id=job['id'],
-                                resume_name=uploaded_file.name,
-                                evaluation_result=evaluation,
-                                resume_file=uploaded_file
-                            )
-
-                            # Display individual result
-                            with results_container.expander(f"Results for {uploaded_file.name}"):
-                                # Candidate Information
-                                st.subheader("Candidate Information")
-                                candidate_info = evaluation.get('candidate_info', {})
-                                info_cols = st.columns(3)
-                                with info_cols[0]:
-                                    st.write("**Name:**", candidate_info.get('name', 'Not found'))
-                                with info_cols[1]:
-                                    st.write("**Email:**", candidate_info.get('email', 'Not found'))
-                                with info_cols[2]:
-                                    st.write("**Phone:**", candidate_info.get('phone', 'Not found'))
-
-                                # Decision with color coding
-                                result = evaluation.get('decision', '').upper()
-                                if result == 'SHORTLIST':
-                                    st.success(f"Decision: {result}")
-                                else:
-                                    st.error(f"Decision: {result}")
-
-                                # Match score
-                                match_score = float(evaluation.get('match_score', 0))
-                                st.write(f"Match Score: {match_score*100:.1f}%")
-                                st.progress(match_score)
-
-                                # Experience Analysis
-                                exp_data = evaluation.get('years_of_experience', {})
-                                cols = st.columns(3)
-                                with cols[0]:
-                                    st.metric("Total Experience", f"{exp_data.get('total', 0)} years")
-                                with cols[1]:
-                                    st.metric("Relevant Experience", f"{exp_data.get('relevant', 0)} years")
-                                with cols[2]:
-                                    st.metric("Required Experience", f"{exp_data.get('required', 0)} years")
-
-                                # Download buttons
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    evaluation_json = json.dumps(evaluation, indent=2)
-                                    st.download_button(
-                                        label="📄 Download Evaluation Report",
-                                        data=evaluation_json,
-                                        file_name=f"evaluation_{uploaded_file.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                                        mime="application/json",
-                                        key=f"download_eval_{index}"
-                                    )
-                                with col2:
-                                    st.download_button(
-                                        label="📥 Download Original Resume",
-                                        data=uploaded_file.getvalue(),
-                                        file_name=uploaded_file.name,
-                                        mime=uploaded_file.type,
-                                        key=f"download_resume_{index}"
-                                    )
-
-                    except Exception as e:
-                        st.error(f"Error processing {uploaded_file.name}: {str(e)}")
-                        continue
-
-                # Update final progress
-                progress_bar.progress(1.0)
-                status_text.text("All resumes processed!")
-                st.success(f"Completed processing {len(uploaded_files)} resumes!")
-
-    with tab2:
-        st.subheader("Evaluations")
-
-        # Period filter
-        col1, col2 = st.columns([2, 3])
-        with col1:
-            period = st.selectbox(
-                "Quick Filter",
-                ["Past Week", "Past Month", "Past Quarter", "Custom Range"],
-                key="eval_period"
-            )
-
-        # Custom date range
-        if period == "Custom Range":
-            with col2:
-                col3, col4 = st.columns(2)
-                with col3:
-                    start_date = st.date_input(
-                        "Start Date",
-                        value=datetime.now() - timedelta(days=7),
-                        max_value=datetime.now()
-                    )
-                with col4:
-                    end_date = st.date_input(
-                        "End Date",
-                        value=datetime.now(),
-                        max_value=datetime.now()
-                    )
-                if start_date > end_date:
-                    st.error("Start date must be before end date")
-                    return
-            evaluations = st.session_state.components['db'].get_evaluations_by_date_range(start_date, end_date)
-        else:
-            # Convert period to database format
-            period_map = {
-                "Past Week": "week",
-                "Past Month": "month",
-                "Past Quarter": "quarter"
-            }
-            evaluations = st.session_state.components['db'].get_evaluations_by_period(period_map[period])
-
-        if not evaluations:
-            st.info("No evaluations found for the selected period.")
-            return
-
-        # Display evaluations as cards
-        st.write("### Evaluation Results")
-
-        # Add search/filter options
-        search_term = st.text_input("Search by resume name or job title", "")
-
-        # Process evaluations
-        for eval_record in evaluations:
-            try:
-                # Extract evaluation data
-                eval_data = {
-                    'id': eval_record[0],
-                    'job_id': eval_record[1],
-                    'resume_name': eval_record[2],
-                    'candidate_name': eval_record[3],
-                    'candidate_email': eval_record[4],
-                    'candidate_phone': eval_record[5],
-                    'result': eval_record[6],
-                    'match_score': float(eval_record[8]) if eval_record[8] is not None else 0.0,
-                    'evaluation_date': eval_record[13],
-                    'job_title': eval_record[15]
-                }
-
-                # Apply search filter
-                if search_term.lower() not in eval_data['resume_name'].lower() and \
-                   search_term.lower() not in eval_data['job_title'].lower() and \
-                   search_term.lower() not in (eval_data['candidate_name'] or '').lower():
-                    continue
-
-                # Create card for each evaluation
-                display_name = eval_data['candidate_name'] if eval_data['candidate_name'] else f"Resume: {eval_data['resume_name']}"
-                decision = eval_data['result'].upper()
-                decision_icon = "✅" if decision == "SHORTLIST" else "❌"
-                with st.expander(f"{decision_icon} {display_name} - {decision} | {eval_data['job_title']} ({eval_data['evaluation_date'].strftime('%Y-%m-%d %H:%M')})"):
-                    # Display candidate contact info if available
-                    if eval_data['candidate_name'] or eval_data['candidate_email'] or eval_data['candidate_phone']:
-                        st.write("#### Candidate Information")
-                        info_cols = st.columns(3)
-                        with info_cols[0]:
-                            st.write("**Name:**", eval_data['candidate_name'] or "Not available")
-                        with info_cols[1]:
-                            st.write("**Email:**", eval_data['candidate_email'] or "Not available")
-                        with info_cols[2]:
-                            st.write("**Phone:**", eval_data['candidate_phone'] or "Not available")
-                        st.markdown("---")  # Add a separator line
-
-                    # Get detailed evaluation data
-                    details = st.session_state.components['db'].get_evaluation_details(eval_data['id'])
-                    if details:
-                        # Download buttons section - Moved to top of card
-                        st.write("#### Download Options")
-                        dl_cols = st.columns(2)
-                        with dl_cols[0]:
-                            # Create downloadable JSON with full evaluation details
-                            evaluation_json = json.dumps(details['evaluation_data'], indent=2)
-                            st.download_button(
-                                label="📄 Download Evaluation Report",
-                                data=evaluation_json,
-                                file_name=f"evaluation_{eval_data['id']}.json",
-                                mime="application/json",
-                                key=f"eval_download_{eval_data['id']}"  # Unique key for each button
-                            )
-
-                        with dl_cols[1]:
-                            # Get resume file data
-                            resume_file = st.session_state.components['db'].get_resume_file(eval_data['id'])
-                            if resume_file and resume_file['file_data']:
-                                st.download_button(
-                                    label="📥 Download Original Resume",
-                                    data=resume_file['file_data'],
-                                    file_name=resume_file['file_name'],
-                                    mime=resume_file['file_type'],
-                                    key=f"resume_download_{eval_data['id']}"  # Unique key for each button
-                                )
-                            else:
-                                st.write("Original resume file not available")
-
-                        st.markdown("---")  # Add a separator line
-
-                        # Experience Assessment Section
-                        st.write("#### Experience Assessment")
-                        exp_cols = st.columns(3)
-                        exp_data = details['evaluation_data'].get('years_of_experience', {})
-
-                        with exp_cols[0]:
-                            st.metric("Total Experience", f"{details['years_experience_total']} years")
-                        with exp_cols[1]:
-                            st.metric("Relevant Experience", f"{details['years_experience_relevant']} years")
-                        with exp_cols[2]:
-                            st.metric("Required Experience", f"{details['years_experience_required']} years")
-
-                        # Experience Analysis Section
-                        st.write("#### Experience Analysis")
-                        if exp_data.get('details'):
-                            st.write(exp_data['details'])
-
-                        # Relevant Projects
-                        if details['key_matches'].get('projects'):
-                            st.write("#### Relevant Projects")
-                            for project in details['key_matches']['projects']:
-                                st.write(f"• {project}")
-
-                        # Evaluation Summary
-                        st.write("#### Evaluation Summary")
-                        st.write(details['justification'])
-
-
-            except Exception as e:
-                logger.error(f"Error displaying evaluation: {str(e)}")
-                continue
-
 def show_analytics():
     st.title("Analytics Dashboard")
 
@@ -557,6 +373,24 @@ def show_analytics():
 
     st.subheader("Job-wise Distribution")
     st.plotly_chart(st.session_state.components['analytics'].plot_job_distribution())
+
+def init_session_state():
+    if 'page' not in st.session_state:
+        st.session_state.page = 'home'
+    if 'components' not in st.session_state:
+        st.session_state.components = None
+
+def sidebar():
+    st.sidebar.title("HR Assistant")
+    pages = {
+        'Home': 'home',
+        'Job Descriptions': 'jobs',
+        'Resume Evaluation': 'evaluation',
+        'Analytics': 'analytics'
+    }
+
+    selection = st.sidebar.radio("Navigate", list(pages.keys()))
+    st.session_state.page = pages[selection]
 
 def main():
     logger.info("Starting HR Assistant application...")

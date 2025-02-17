@@ -8,6 +8,7 @@ import json
 from database import Database
 from ai_evaluator import AIEvaluator
 from pdf_processor import PDFProcessor
+from docx_processor import DOCXProcessor  # Add import
 from analytics import Analytics
 from utils import extract_text_from_upload
 from report_generator import generate_evaluation_report
@@ -30,15 +31,17 @@ def initialize_components():
         ai_evaluator = AIEvaluator()
         logger.info("AI Evaluator initialization successful")
 
-        logger.info("Initializing PDF Processor and Analytics...")
+        logger.info("Initializing PDF Processor, DOCX Processor and Analytics...")
         pdf_processor = PDFProcessor()
+        docx_processor = DOCXProcessor()  # Add DOCX processor
         analytics = Analytics()
-        logger.info("PDF Processor and Analytics initialization successful")
+        logger.info("PDF Processor, DOCX Processor and Analytics initialization successful")
 
         return {
             'db': db,
             'ai_evaluator': ai_evaluator,
             'pdf_processor': pdf_processor,
+            'docx_processor': docx_processor,  # Add to components
             'analytics': analytics
         }
     except Exception as e:
@@ -48,8 +51,14 @@ def initialize_components():
 def process_single_resume(resume_file, job_description, evaluation_criteria, components):
     """Process a single resume and show results"""
     try:
-        # Extract text from PDF
-        resume_text = components['pdf_processor'].extract_text(resume_file)
+        # Extract text based on file type
+        file_extension = resume_file.name.lower().split('.')[-1]
+        if file_extension == 'pdf':
+            resume_text = components['pdf_processor'].extract_text(resume_file)
+        elif file_extension == 'docx':
+            resume_text = components['docx_processor'].extract_text(resume_file)
+        else:
+            raise Exception(f"Unsupported file format: {file_extension}")
 
         # Evaluate with AI
         evaluation = components['ai_evaluator'].evaluate_resume(
@@ -150,11 +159,11 @@ def show_evaluation():
 
     selected_job = st.selectbox("Select Job Description", job_titles)
 
-    # Resume upload with max limit warning
+    # Update file uploader to accept both PDF and DOCX
     st.write("Upload Resumes (Maximum 5 resumes can be uploaded at a time)")
     uploaded_files = st.file_uploader(
-        "Upload Resumes (PDF)",
-        type=['pdf'],
+        "Upload Resumes (PDF or DOCX)",
+        type=['pdf', 'docx'],
         accept_multiple_files=True
     )
 

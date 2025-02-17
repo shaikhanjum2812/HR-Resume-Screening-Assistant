@@ -394,23 +394,31 @@ def show_past_evaluations():
                 st.info("No evaluations found for the selected period.")
                 return
         else:
-            # Custom date range selection
-            col1, col2 = st.columns(2)
-            with col1:
-                start_date = st.date_input("Start Date", value=datetime.now() - timedelta(days=7))
-            with col2:
-                end_date = st.date_input("End Date", value=datetime.now())
+            # Custom date range selection with Apply button
+            with st.form("date_range_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    start_date = st.date_input("Start Date", value=datetime.now() - timedelta(days=7))
+                with col2:
+                    end_date = st.date_input("End Date", value=datetime.now())
 
-            if start_date > end_date:
-                st.error("Start date must be before end date")
-                return
+                # Add Apply button
+                submitted = st.form_submit_button("Apply")
 
-            # Get evaluations for custom date range
-            evaluations = st.session_state.components['db'].get_evaluations_by_date_range(start_date, end_date)
+                if submitted:
+                    if start_date > end_date:
+                        st.error("Start date must be before end date")
+                        return
 
-            if not evaluations:
-                st.info("No evaluations found for the selected date range.")
-                return
+                    # Get evaluations for custom date range
+                    evaluations = st.session_state.components['db'].get_evaluations_by_date_range(start_date, end_date)
+
+                    if not evaluations:
+                        st.info("No evaluations found for the selected date range.")
+                        return
+                else:
+                    # Don't show any evaluations until Apply is clicked
+                    return
 
         # Display evaluations in an expandable format
         for eval_data in evaluations:

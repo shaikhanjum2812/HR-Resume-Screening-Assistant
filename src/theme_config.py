@@ -6,7 +6,7 @@ DEFAULT_THEME = {
     "primary": "#0068C9",  # Dark blue
     "background": "#0E1117",
     "secondary": "#31333F",
-    "text": "#FFFFFF",  # Changed to pure white for better visibility
+    "text": "#FFFFFF",  # Pure white for maximum visibility
     "highlight": "#00C0F2"
 }
 
@@ -34,10 +34,14 @@ def apply_theme() -> Dict[str, Any]:
             div[data-testid="stMetricValue"] {{
                 color: {theme["primary"]};
             }}
+            /* Specific styling for welcome text */
             .welcome-text {{
                 color: {theme["text"]} !important;
                 font-size: 1.2em !important;
                 opacity: 1 !important;
+                font-weight: 500 !important;
+                margin: 1em 0 !important;
+                display: block !important;
             }}
         </style>
     """

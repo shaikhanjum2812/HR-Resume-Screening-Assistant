@@ -12,7 +12,6 @@ from docx_processor import DOCXProcessor
 from analytics import Analytics
 from utils import extract_text_from_upload
 from report_generator import generate_evaluation_report
-from theme_config import apply_theme
 
 # Configure logging
 logging.basicConfig(
@@ -42,7 +41,7 @@ def initialize_components():
             'db': db,
             'ai_evaluator': ai_evaluator,
             'pdf_processor': pdf_processor,
-            'docx_processor': docx_processor,  # Add to components
+            'docx_processor': docx_processor,
             'analytics': analytics
         }
     except Exception as e:
@@ -572,9 +571,6 @@ def init_session_state():
 def sidebar():
     st.sidebar.title("HR Assistant")
 
-    # Apply the default theme
-    apply_theme()
-
     # Navigation menu
     pages = {
         'Home': 'home',
@@ -618,7 +614,7 @@ def main():
             show_jobs()
         elif st.session_state.page == 'evaluation':
             show_evaluation()
-        elif st.session_state.page == 'past_evaluations':  # Add new page routing
+        elif st.session_state.page == 'past_evaluations':
             show_past_evaluations()
         elif st.session_state.page == 'analytics':
             show_analytics()

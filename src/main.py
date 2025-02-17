@@ -390,13 +390,13 @@ def show_past_evaluations():
 
         # Display evaluations in an expandable format
         for eval_data in evaluations:
-            eval_id = eval_data[0]
-            resume_name = eval_data[2]
-            candidate_name = eval_data[3] or "N/A"
-            result = eval_data[6]
-            match_score = eval_data[8]
-            evaluation_date = eval_data[13]
-            job_title = eval_data[15]
+            eval_id = eval_data[0]  # ID
+            resume_name = eval_data[2]  # Resume name
+            candidate_name = eval_data[3] or "N/A"  # Candidate name
+            result = eval_data[6]  # Result
+            match_score = eval_data[8]  # Match score
+            evaluation_date = eval_data[13]  # Evaluation date
+            job_title = eval_data[15]  # Job title
 
             # Create an expander for each evaluation
             with st.expander(f"{candidate_name} - {job_title} ({evaluation_date:%Y-%m-%d})"):
@@ -422,7 +422,7 @@ def show_past_evaluations():
                             data=evaluation_json,
                             file_name=f"evaluation_{resume_name}_{evaluation_date:%Y%m%d}.json",
                             mime="application/json",
-                            key=f"eval_report_{eval_id}"  # Added unique key
+                            key=f"eval_report_{eval_id}"
                         )
 
                     with col2:
@@ -434,7 +434,7 @@ def show_past_evaluations():
                                 data=resume_file['file_data'],
                                 file_name=resume_file['file_name'],
                                 mime=resume_file['file_type'],
-                                key=f"resume_{eval_id}"  # Added unique key
+                                key=f"resume_{eval_id}"
                             )
 
                     # Display detailed metrics

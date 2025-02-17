@@ -378,10 +378,10 @@ def show_past_evaluations():
     st.title("Past Evaluations")
 
     # Filter type selection
-    filter_type = st.radio("Select Filter Type", ["Preset Periods", "Custom Date Range"], horizontal=True)
+    filter_type = st.radio("Select Filter Type", ["Time Period", "Custom Date Range"], horizontal=True)
 
     try:
-        if filter_type == "Preset Periods":
+        if filter_type == "Time Period":
             # Add period filter with updated options
             period = st.selectbox("Time Period", ["Last week", "Last month"], key="eval_period")
             # Convert friendly names to database period values

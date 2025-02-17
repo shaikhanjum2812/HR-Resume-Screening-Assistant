@@ -6,7 +6,7 @@ DEFAULT_THEME = {
     "primary": "#0068C9",  # Dark blue
     "background": "#0E1117",
     "secondary": "#31333F",
-    "text": "#FAFAFA",
+    "text": "#FFFFFF",  # Changed to pure white for better visibility
     "highlight": "#00C0F2"
 }
 
@@ -19,7 +19,7 @@ def apply_theme() -> Dict[str, Any]:
         <style>
             .stButton button {{
                 background-color: {theme["primary"]};
-                color: {theme["background"]};
+                color: {theme["text"]};
             }}
             .stTextInput input {{
                 border-color: {theme["secondary"]};
@@ -28,10 +28,16 @@ def apply_theme() -> Dict[str, Any]:
                 border-color: {theme["secondary"]};
             }}
             div.stMarkdown p {{
-                color: {theme["text"]};
+                color: {theme["text"]} !important;
+                opacity: 1 !important;
             }}
             div[data-testid="stMetricValue"] {{
                 color: {theme["primary"]};
+            }}
+            .welcome-text {{
+                color: {theme["text"]} !important;
+                font-size: 1.2em !important;
+                opacity: 1 !important;
             }}
         </style>
     """

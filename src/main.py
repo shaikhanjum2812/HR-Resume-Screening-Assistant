@@ -189,7 +189,7 @@ def show_evaluation():
 
 def show_home():
     st.title("HR Assistant Dashboard")
-    st.write("Welcome to the HR Assistant tool. Use the sidebar to navigate.")
+    st.markdown('<p class="welcome-text">Welcome to the HR Assistant tool. Use the sidebar to navigate.</p>', unsafe_allow_html=True)
 
     try:
         db = st.session_state.components['db']

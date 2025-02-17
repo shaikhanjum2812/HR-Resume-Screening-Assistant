@@ -15,7 +15,7 @@ class AIEvaluator:
             )
         self.client = OpenAI(api_key=api_key)
 
-    def extract_candidate_info(self, resume_text: str) -> Dict[str, str]:
+    def extract_candidate_info(self, resume_text: str) -> Dict[str, Optional[str]]:
         """Extract candidate's personal information from resume using GPT-4."""
         try:
             response = self.client.chat.completions.create(
@@ -43,13 +43,26 @@ class AIEvaluator:
                 temperature=0.1
             )
 
-            content = response.choices[0].message.content.strip()
-            return json.loads(content)
+            try:
+                content = response.choices[0].message.content.strip()
+                result = json.loads(content)
+
+                # Validate response format
+                required_fields = ['name', 'email', 'phone', 'location', 'linkedin']
+                if not all(field in result for field in required_fields):
+                    logger.error(f"Invalid response format from OpenAI API: {content}")
+                    return {field: None for field in required_fields}
+
+                return result
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse candidate info JSON: {str(e)}, Response: {content}")
+                return {"name": None, "email": None, "phone": None, "location": None, "linkedin": None}
+
         except Exception as e:
             logger.error(f"Error extracting candidate info: {str(e)}")
             return {"name": None, "email": None, "phone": None, "location": None, "linkedin": None}
 
-    def evaluate_resume(self, resume_text: str, job_description: str, evaluation_criteria: dict = None) -> Dict[str, Union[str, float, List[str]]]:
+    def evaluate_resume(self, resume_text: str, job_description: str, evaluation_criteria: Optional[dict] = None) -> Dict[str, Union[str, float, List[str]]]:
         try:
             # Extract candidate information first
             candidate_info = self.extract_candidate_info(resume_text)
@@ -149,25 +162,39 @@ class AIEvaluator:
                 max_tokens=2000
             )
 
-            result = json.loads(response.choices[0].message.content.strip())
+            try:
+                content = response.choices[0].message.content.strip()
+                result = json.loads(content)
 
-            # Add candidate information to the result
-            result['candidate_info'] = candidate_info
+                # Validate required fields
+                required_fields = [
+                    'decision', 'confidence_score', 'justification', 'match_score',
+                    'years_of_experience', 'sap_experience', 'it_services_experience',
+                    'key_matches', 'missing_requirements'
+                ]
 
-            # Validate response format
-            required_keys = [
-                'decision', 'justification', 'match_score', 'years_of_experience',
-                'sap_experience', 'it_services_experience', 'key_matches', 'missing_requirements'
-            ]
-            if not all(key in result for key in required_keys):
-                raise ValueError("Invalid response format from OpenAI API")
+                if not all(field in result for field in required_fields):
+                    logger.error(f"Invalid response format from OpenAI API: {content}")
+                    raise ValueError("Response missing required fields")
 
-            return result
+                # Add candidate information to the result
+                result['candidate_info'] = candidate_info
 
-        except json.JSONDecodeError:
-            raise Exception("Failed to parse OpenAI API response")
+                return result
+
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse evaluation JSON: {str(e)}\nResponse content: {content}")
+                raise ValueError(f"Failed to parse OpenAI API response: {str(e)}")
+            except KeyError as e:
+                logger.error(f"Missing required field in response: {str(e)}\nResponse content: {content}")
+                raise ValueError(f"Invalid response format: missing field {str(e)}")
+            except Exception as e:
+                logger.error(f"Error processing evaluation response: {str(e)}\nResponse content: {content}")
+                raise
+
         except Exception as e:
-            raise Exception(f"Failed to evaluate resume: {str(e)}")
+            logger.error(f"Failed to evaluate resume: {str(e)}")
+            raise
 
     def get_improvement_suggestions(self, resume_text: str, job_description: str) -> Dict[str, List[str]]:
         """Get specific suggestions for improving the resume for the job."""
@@ -204,7 +231,13 @@ class AIEvaluator:
                 temperature=0.4
             )
 
-            return json.loads(response.choices[0].message.content.strip())
+            try:
+                content = response.choices[0].message.content.strip()
+                return json.loads(content)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse improvement suggestions JSON: {str(e)}\nResponse: {content}")
+                raise ValueError(f"Failed to parse OpenAI API response for improvement suggestions: {str(e)}")
 
         except Exception as e:
-            raise Exception(f"Failed to get improvement suggestions: {str(e)}")
+            logger.error(f"Failed to get improvement suggestions: {str(e)}")
+            raise

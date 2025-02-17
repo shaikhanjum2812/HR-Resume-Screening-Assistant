@@ -395,6 +395,54 @@ def show_analytics():
     st.subheader("Job-wise Distribution")
     st.plotly_chart(st.session_state.components['analytics'].plot_job_distribution())
 
+def format_evaluation_as_text(evaluation_data):
+    """Convert evaluation data to a readable text format"""
+    text = []
+    text.append("RESUME EVALUATION REPORT")
+    text.append("=" * 50 + "\n")
+
+    # Candidate Information
+    text.append("CANDIDATE INFORMATION")
+    text.append("-" * 30)
+    candidate_info = evaluation_data.get('candidate_info', {})
+    text.append(f"Name: {candidate_info.get('name', 'Not provided')}")
+    text.append(f"Email: {candidate_info.get('email', 'Not provided')}")
+    text.append(f"Phone: {candidate_info.get('phone', 'Not provided')}")
+    text.append(f"Location: {candidate_info.get('location', 'Not provided')}")
+    text.append(f"LinkedIn: {candidate_info.get('linkedin', 'Not provided')}\n")
+
+    # Evaluation Results
+    text.append("EVALUATION RESULTS")
+    text.append("-" * 30)
+    text.append(f"Decision: {evaluation_data.get('decision', 'Not provided')}")
+    text.append(f"Match Score: {float(evaluation_data.get('match_score', 0))*100:.1f}%")
+    text.append(f"\nJustification:\n{evaluation_data.get('justification', 'No justification provided')}\n")
+
+    # Experience Analysis
+    text.append("EXPERIENCE ANALYSIS")
+    text.append("-" * 30)
+    exp_data = evaluation_data.get('years_of_experience', {})
+    text.append(f"Total Experience: {exp_data.get('total', 0)} years")
+    text.append(f"Relevant Experience: {exp_data.get('relevant', 0)} years")
+    text.append(f"Required Experience: {exp_data.get('required', 0)} years")
+    text.append(f"Meets Requirement: {'Yes' if exp_data.get('meets_requirement', False) else 'No'}\n")
+
+    # Key Matches
+    text.append("KEY MATCHES & MISSING REQUIREMENTS")
+    text.append("-" * 30)
+    key_matches = evaluation_data.get('key_matches', {})
+    if isinstance(key_matches, dict) and 'skills' in key_matches:
+        text.append("Matching Skills:")
+        for skill in key_matches['skills']:
+            text.append(f"• {skill}")
+
+    text.append("\nMissing Requirements:")
+    missing_reqs = evaluation_data.get('missing_requirements', [])
+    for req in missing_reqs:
+        text.append(f"• {req}")
+
+    return "\n".join(text)
+
 def show_past_evaluations():
     st.title("Past Evaluations")
 
@@ -468,14 +516,14 @@ def show_past_evaluations():
                     # Download buttons
                     col1, col2 = st.columns(2)
                     with col1:
-                        # Download evaluation report
+                        # Download evaluation report in TXT format
                         if 'evaluation_data' in detailed_eval:
-                            evaluation_json = json.dumps(detailed_eval['evaluation_data'], indent=2)
+                            evaluation_text = format_evaluation_as_text(detailed_eval['evaluation_data'])
                             st.download_button(
-                                label="📄 Download Evaluation Report",
-                                data=evaluation_json,
-                                file_name=f"evaluation_{resume_name}_{evaluation_date:%Y%m%d}.json",
-                                mime="application/json",
+                                label="📄 Download Evaluation Report (TXT)",
+                                data=evaluation_text,
+                                file_name=f"evaluation_{resume_name}_{evaluation_date:%Y%m%d}.txt",
+                                mime="text/plain",
                                 key=f"eval_report_{eval_id}"
                             )
 

@@ -411,24 +411,25 @@ def show_past_evaluations():
 
                 # Get detailed evaluation data
                 detailed_eval = st.session_state.components['db'].get_evaluation_details(eval_id)
-                if detailed_eval:
+                if detailed_eval and isinstance(detailed_eval, dict):
                     # Download buttons
                     col1, col2 = st.columns(2)
                     with col1:
                         # Download evaluation report with unique key
-                        evaluation_json = json.dumps(detailed_eval['evaluation_data'], indent=2)
-                        st.download_button(
-                            label="📄 Download Evaluation Report",
-                            data=evaluation_json,
-                            file_name=f"evaluation_{resume_name}_{evaluation_date:%Y%m%d}.json",
-                            mime="application/json",
-                            key=f"eval_report_{eval_id}"
-                        )
+                        if 'evaluation_data' in detailed_eval:
+                            evaluation_json = json.dumps(detailed_eval['evaluation_data'], indent=2)
+                            st.download_button(
+                                label="📄 Download Evaluation Report",
+                                data=evaluation_json,
+                                file_name=f"evaluation_{resume_name}_{evaluation_date:%Y%m%d}.json",
+                                mime="application/json",
+                                key=f"eval_report_{eval_id}"
+                            )
 
                     with col2:
                         # Download original resume with unique key
                         resume_file = st.session_state.components['db'].get_resume_file(eval_id)
-                        if resume_file:
+                        if resume_file and isinstance(resume_file, dict):
                             st.download_button(
                                 label="📥 Download Original Resume",
                                 data=resume_file['file_data'],
@@ -437,18 +438,23 @@ def show_past_evaluations():
                                 key=f"resume_{eval_id}"
                             )
 
-                    # Display detailed metrics
-                    st.write("#### Evaluation Details")
-                    st.write("**Key Matches:**")
-                    for skill in detailed_eval['key_matches'].get('skills', []):
-                        st.write(f"- {skill}")
+                    # Display detailed metrics if they exist
+                    if 'key_matches' in detailed_eval and isinstance(detailed_eval['key_matches'], dict):
+                        st.write("#### Key Matches")
+                        key_matches = detailed_eval['key_matches']
+                        if 'skills' in key_matches and isinstance(key_matches['skills'], list):
+                            st.write("**Skills:**")
+                            for skill in key_matches['skills']:
+                                st.write(f"- {skill}")
 
-                    st.write("**Missing Requirements:**")
-                    for req in detailed_eval['missing_requirements']:
-                        st.write(f"- {req}")
+                    if 'missing_requirements' in detailed_eval and isinstance(detailed_eval['missing_requirements'], list):
+                        st.write("**Missing Requirements:**")
+                        for req in detailed_eval['missing_requirements']:
+                            st.write(f"- {req}")
 
-                    st.write("**Experience Analysis:**")
-                    st.write(detailed_eval['experience_analysis'])
+                    if 'experience_analysis' in detailed_eval:
+                        st.write("**Experience Analysis:**")
+                        st.write(detailed_eval['experience_analysis'])
 
     except Exception as e:
         st.error(f"Error loading evaluations: {str(e)}")

@@ -266,103 +266,116 @@ def show_evaluation():
         job_titles = [job['title'] for job in jobs]
         selected_job = st.selectbox("Select Job Description", job_titles)
 
-        # Resume upload
-        uploaded_file = st.file_uploader("Upload Resume (PDF)", type=['pdf'])
+        # Multiple resume upload
+        st.write("Upload Resumes (Maximum 5 files)")
+        uploaded_files = st.file_uploader("Upload Resumes (PDF)", type=['pdf'], accept_multiple_files=True)
 
-        if uploaded_file and selected_job:
-            if st.button("Evaluate Resume"):
-                with st.spinner("Processing resume..."):
-                    # Extract text from PDF
-                    resume_text = st.session_state.components['pdf_processor'].extract_text(uploaded_file)
+        if uploaded_files and selected_job:
+            if len(uploaded_files) > 5:
+                st.error("Please upload a maximum of 5 resumes at a time.")
+                return
 
-                    # Get job description and criteria
-                    job = next(job for job in jobs if job['title'] == selected_job)
-                    criteria = st.session_state.components['db'].get_evaluation_criteria(job['id']) if job['has_criteria'] else None
+            if st.button("Evaluate Resumes"):
+                # Get job description and criteria
+                job = next(job for job in jobs if job['title'] == selected_job)
+                criteria = st.session_state.components['db'].get_evaluation_criteria(job['id']) if job['has_criteria'] else None
 
-                    # Evaluate with AI
-                    evaluation = st.session_state.components['ai_evaluator'].evaluate_resume(
-                        resume_text,
-                        job['description'],
-                        evaluation_criteria=criteria
-                    )
+                # Create a progress bar
+                progress_bar = st.progress(0)
+                status_text = st.empty()
 
-                    # Save complete evaluation results with the resume file
-                    st.session_state.components['db'].save_evaluation(
-                        job_id=job['id'],
-                        resume_name=uploaded_file.name,
-                        evaluation_result=evaluation,
-                        resume_file=uploaded_file
-                    )
+                # Container for results
+                results_container = st.container()
 
-                    # Display results
-                    st.success("Evaluation Complete!")
+                for index, uploaded_file in enumerate(uploaded_files):
+                    try:
+                        # Update progress
+                        progress = (index + 1) / len(uploaded_files)
+                        progress_bar.progress(progress)
+                        status_text.text(f"Processing {uploaded_file.name}... ({index + 1}/{len(uploaded_files)})")
 
-                    # Download buttons section
-                    st.subheader("Download Options")
-                    col1, col2 = st.columns(2)
+                        with st.spinner(f"Processing {uploaded_file.name}..."):
+                            # Extract text from PDF
+                            resume_text = st.session_state.components['pdf_processor'].extract_text(uploaded_file)
 
-                    with col1:
-                        # Create downloadable JSON with full evaluation details
-                        evaluation_json = json.dumps(evaluation, indent=2)
-                        st.download_button(
-                            label="📄 Download Evaluation Report",
-                            data=evaluation_json,
-                            file_name=f"evaluation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                            mime="application/json",
-                            key="download_eval"
-                        )
+                            # Evaluate with AI
+                            evaluation = st.session_state.components['ai_evaluator'].evaluate_resume(
+                                resume_text,
+                                job['description'],
+                                evaluation_criteria=criteria
+                            )
 
-                    with col2:
-                        st.download_button(
-                            label="📥 Download Original Resume",
-                            data=uploaded_file.getvalue(),
-                            file_name=uploaded_file.name,
-                            mime=uploaded_file.type,
-                            key="download_resume"
-                        )
+                            # Save evaluation results
+                            st.session_state.components['db'].save_evaluation(
+                                job_id=job['id'],
+                                resume_name=uploaded_file.name,
+                                evaluation_result=evaluation,
+                                resume_file=uploaded_file
+                            )
 
-                    # Candidate Information Section
-                    st.subheader("Candidate Information")
-                    candidate_info = evaluation.get('candidate_info', {})
-                    info_cols = st.columns(3)
-                    with info_cols[0]:
-                        st.write("**Name:**", candidate_info.get('name', 'Not found'))
-                    with info_cols[1]:
-                        st.write("**Email:**", candidate_info.get('email', 'Not found'))
-                    with info_cols[2]:
-                        st.write("**Phone:**", candidate_info.get('phone', 'Not found'))
+                            # Display individual result
+                            with results_container.expander(f"Results for {uploaded_file.name}"):
+                                # Candidate Information
+                                st.subheader("Candidate Information")
+                                candidate_info = evaluation.get('candidate_info', {})
+                                info_cols = st.columns(3)
+                                with info_cols[0]:
+                                    st.write("**Name:**", candidate_info.get('name', 'Not found'))
+                                with info_cols[1]:
+                                    st.write("**Email:**", candidate_info.get('email', 'Not found'))
+                                with info_cols[2]:
+                                    st.write("**Phone:**", candidate_info.get('phone', 'Not found'))
 
-                    # Decision with color coding
-                    result = evaluation.get('decision', '').upper()
-                    if result == 'SHORTLIST':
-                        st.success(f"Decision: {result}")
-                    else:
-                        st.error(f"Decision: {result}")
+                                # Decision with color coding
+                                result = evaluation.get('decision', '').upper()
+                                if result == 'SHORTLIST':
+                                    st.success(f"Decision: {result}")
+                                else:
+                                    st.error(f"Decision: {result}")
 
-                    # Match score with progress bar
-                    st.subheader("Match Score")
-                    match_score = float(evaluation.get('match_score', 0))
-                    st.progress(match_score)
-                    st.write(f"Match Score: {match_score*100:.1f}%")
+                                # Match score
+                                match_score = float(evaluation.get('match_score', 0))
+                                st.write(f"Match Score: {match_score*100:.1f}%")
+                                st.progress(match_score)
 
-                    # Experience Analysis
-                    st.subheader("Experience Analysis")
-                    exp_data = evaluation.get('years_of_experience', {})
-                    cols = st.columns(3)
-                    with cols[0]:
-                        st.metric("Total Experience", f"{exp_data.get('total', 0)} years")
-                    with cols[1]:
-                        st.metric("Relevant Experience", f"{exp_data.get('relevant', 0)} years")
-                    with cols[2]:
-                        st.metric("Required Experience", f"{exp_data.get('required', 0)} years")
+                                # Experience Analysis
+                                exp_data = evaluation.get('years_of_experience', {})
+                                cols = st.columns(3)
+                                with cols[0]:
+                                    st.metric("Total Experience", f"{exp_data.get('total', 0)} years")
+                                with cols[1]:
+                                    st.metric("Relevant Experience", f"{exp_data.get('relevant', 0)} years")
+                                with cols[2]:
+                                    st.metric("Required Experience", f"{exp_data.get('required', 0)} years")
 
-                    # Detailed justification
-                    st.subheader("Evaluation Details")
-                    st.write("**Justification:**", evaluation.get('justification', ''))
+                                # Download buttons
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    evaluation_json = json.dumps(evaluation, indent=2)
+                                    st.download_button(
+                                        label="📄 Download Evaluation Report",
+                                        data=evaluation_json,
+                                        file_name=f"evaluation_{uploaded_file.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                                        mime="application/json",
+                                        key=f"download_eval_{index}"
+                                    )
+                                with col2:
+                                    st.download_button(
+                                        label="📥 Download Original Resume",
+                                        data=uploaded_file.getvalue(),
+                                        file_name=uploaded_file.name,
+                                        mime=uploaded_file.type,
+                                        key=f"download_resume_{index}"
+                                    )
 
-                    if 'experience_analysis' in evaluation:
-                        st.write("**Experience Analysis:**", evaluation['experience_analysis'])
+                    except Exception as e:
+                        st.error(f"Error processing {uploaded_file.name}: {str(e)}")
+                        continue
 
+                # Update final progress
+                progress_bar.progress(1.0)
+                status_text.text("All resumes processed!")
+                st.success(f"Completed processing {len(uploaded_files)} resumes!")
 
     with tab2:
         st.subheader("Evaluations")

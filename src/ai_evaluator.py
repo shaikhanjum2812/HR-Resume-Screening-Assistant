@@ -27,24 +27,38 @@ class AIEvaluator:
         try:
             logger.info("Extracting candidate information")
             prompt = """
-            Extract the following information from the resume text. Respond in JSON format:
+            You are a resume parser expert. Carefully analyze the resume text and extract the following information.
+            Pay special attention to:
+            1. Name: Look for the full name typically at the top of the resume
+            2. Email: Search for email addresses in standard formats (e.g., example@domain.com)
+            3. Phone: Find phone numbers in any format, standardize to +X-XXX-XXX-XXXX or similar
+            4. Location: Look for city/state/country information
+            5. LinkedIn: Search for LinkedIn profile URLs or handles
+
+            If you can't find exact information, make a best effort to infer from context. For example:
+            - Name might be in the document properties or email address
+            - Phone numbers might be in different formats
+            - Location might be mentioned in work experience
+
+            Never return null or None - if information is truly not found, return "Not provided" for text fields.
+
+            Respond in this exact JSON format:
             {
-                "name": "candidate full name",
+                "name": "candidate's full name",
                 "email": "email address",
                 "phone": "phone number",
                 "location": "location if available",
                 "linkedin": "LinkedIn profile URL if available"
             }
-            If any field is not found, use null as the value.
 
-            Resume text:
+            Resume text to analyze:
             {resume_text}
             """
 
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a resume parser expert."},
+                    {"role": "system", "content": "You are a resume parser expert. Be thorough in extracting contact information."},
                     {"role": "user", "content": prompt.format(resume_text=resume_text)}
                 ],
                 response_format={"type": "json_object"}
@@ -52,15 +66,21 @@ class AIEvaluator:
 
             result = json.loads(response.choices[0].message.content)
             logger.info("Successfully extracted candidate information")
+
+            # Ensure no None values in the result
+            for key in result:
+                if result[key] is None or result[key].lower() == 'none':
+                    result[key] = "Not provided"
+
             return result
         except Exception as e:
             logger.error(f"Failed to extract candidate information: {e}")
             return {
-                "name": None,
-                "email": None,
-                "phone": None,
-                "location": None,
-                "linkedin": None
+                "name": "Not provided",
+                "email": "Not provided",
+                "phone": "Not provided",
+                "location": "Not provided",
+                "linkedin": "Not provided"
             }
 
     def _analyze_experience(self, resume_text: str, job_description: str, min_years: int = 0) -> Dict[str, Any]:

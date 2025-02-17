@@ -11,6 +11,7 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "pypdf2>=3.0.1",
     "python-docx>=1.1.2",
+    "reportlab>=4.3.1",
     "streamlit>=1.42.0",
     "twilio>=9.4.5",
     "watchdog>=6.0.0",

@@ -10,6 +10,7 @@ from ai_evaluator import AIEvaluator
 from pdf_processor import PDFProcessor
 from analytics import Analytics
 from utils import extract_text_from_upload
+from report_generator import generate_evaluation_report
 
 # Configure logging
 logging.basicConfig(
@@ -112,12 +113,13 @@ def process_single_resume(resume_file, job_description, evaluation_criteria, com
         st.write("#### Download Options")
         col1, col2 = st.columns(2)
         with col1:
-            evaluation_json = json.dumps(evaluation, indent=2)
+            # Generate PDF report
+            pdf_buffer = generate_evaluation_report(evaluation, resume_file.name)
             st.download_button(
-                label="📄 Download Evaluation Report",
-                data=evaluation_json,
-                file_name=f"evaluation_{resume_file.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                mime="application/json"
+                label="📄 Download Evaluation Report (PDF)",
+                data=pdf_buffer,
+                file_name=f"evaluation_{resume_file.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf"
             )
         with col2:
             st.download_button(

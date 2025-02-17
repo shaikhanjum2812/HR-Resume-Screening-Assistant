@@ -315,6 +315,21 @@ class Database:
             '''
         return self.execute_query(query)[0][0]
 
+    def get_total_evaluations_count(self):
+        """Get the total number of evaluations"""
+        query = 'SELECT COUNT(*) FROM evaluations'
+        return self.execute_query(query)[0][0] or 0
+
+    def get_shortlisted_count(self):
+        """Get the total number of shortlisted resumes"""
+        query = "SELECT COUNT(*) FROM evaluations WHERE LOWER(result) = 'shortlist'"
+        return self.execute_query(query)[0][0] or 0
+
+    def get_rejected_count(self):
+        """Get the total number of rejected resumes"""
+        query = "SELECT COUNT(*) FROM evaluations WHERE LOWER(result) = 'reject'"
+        return self.execute_query(query)[0][0] or 0
+
     def get_evaluation_criteria(self, job_id):
         query = 'SELECT * FROM evaluation_criteria WHERE job_id = %s'
         criteria = self.execute_query(query, (job_id,))

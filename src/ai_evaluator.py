@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
 from openai import OpenAI, APIError
+from anthropic import Anthropic
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -11,65 +12,86 @@ logger = logging.getLogger(__name__)
 
 class AIEvaluator:
     def __init__(self):
-        """Initialize the AI Evaluator with OpenAI client"""
+        """Initialize the AI Evaluator with OpenAI and Anthropic clients"""
         try:
-            self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            self.openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            self.anthropic_client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
             # do not change this unless explicitly requested by the user
-            self.model = "gpt-4o"
-            logger.info("AIEvaluator initialized successfully")
+            self.openai_model = "gpt-4o"
+            # the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
+            # do not change this unless explicitly requested by the user
+            self.anthropic_model = "claude-3-5-sonnet-20241022"
+            logger.info("AIEvaluator initialized successfully with both OpenAI and Anthropic")
         except Exception as e:
             logger.error(f"Failed to initialize AIEvaluator: {e}")
             raise
 
     def _extract_candidate_info(self, resume_text: str) -> Dict[str, Any]:
-        """Extract candidate information from resume text"""
+        """Extract candidate information from resume text using Anthropic's Claude"""
         try:
-            logger.info("Extracting candidate information")
-            prompt = """
-            You are a resume parser expert. Carefully analyze the resume text and extract the following information.
-            Pay special attention to:
-            1. Name: Look for the full name typically at the top of the resume
-            2. Email: Search for email addresses in standard formats (e.g., example@domain.com)
-            3. Phone: Find phone numbers in any format, standardize to +X-XXX-XXX-XXXX or similar
-            4. Location: Look for city/state/country information
-            5. LinkedIn: Search for LinkedIn profile URLs or handles
+            logger.info("Extracting candidate information using Claude")
+            prompt = f"""
+            You are a professional resume parser. Your task is to carefully extract the following information from the resume text.
+            You must find:
+            1. Full Name (usually at the top)
+            2. Email Address (in standard format like example@domain.com)
+            3. Phone Number (any format, standardize if possible)
+            4. Location (city/state/country)
+            5. LinkedIn URL (if available)
 
-            If you can't find exact information, make a best effort to infer from context. For example:
-            - Name might be in the document properties or email address
-            - Phone numbers might be in different formats
-            - Location might be mentioned in work experience
-
-            Never return null or None - if information is truly not found, return "Not provided" for text fields.
-
-            Respond in this exact JSON format:
-            {
-                "name": "candidate's full name",
-                "email": "email address",
-                "phone": "phone number",
-                "location": "location if available",
-                "linkedin": "LinkedIn profile URL if available"
-            }
+            Rules:
+            - If a field is not directly visible, try to infer it from context (e.g., name from email)
+            - NEVER return null, None, or empty values
+            - If information is truly not found, use "Not provided"
+            - Be thorough in your search and consider all parts of the resume
+            - Format phone numbers consistently when found
+            - Return exact matches when found, don't paraphrase
 
             Resume text to analyze:
             {resume_text}
+
+            Provide the information in this exact JSON format:
+            {{
+                "name": "Full Name",
+                "email": "email@address.com",
+                "phone": "Phone Number",
+                "location": "City, State/Country",
+                "linkedin": "LinkedIn Profile URL"
+            }}
             """
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a resume parser expert. Be thorough in extracting contact information."},
-                    {"role": "user", "content": prompt.format(resume_text=resume_text)}
-                ],
-                response_format={"type": "json_object"}
-            )
+            # First try with Anthropic
+            try:
+                response = self.anthropic_client.messages.create(
+                    model=self.anthropic_model,
+                    max_tokens=1000,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                )
+                result = json.loads(response.content)
+            except Exception as e:
+                logger.warning(f"Anthropic extraction failed, falling back to OpenAI: {e}")
+                # Fallback to OpenAI
+                response = self.openai_client.chat.completions.create(
+                    model=self.openai_model,
+                    messages=[
+                        {"role": "system", "content": "You are a resume parser expert. Be thorough in extracting contact information."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"}
+                )
+                result = json.loads(response.choices[0].message.content)
 
-            result = json.loads(response.choices[0].message.content)
             logger.info("Successfully extracted candidate information")
 
-            # Ensure no None values in the result
-            for key in result:
-                if result[key] is None or result[key].lower() == 'none':
+            # Validate and clean results
+            for key in ['name', 'email', 'phone', 'location', 'linkedin']:
+                if key not in result or not result[key] or result[key].lower() in ['none', 'null', '']:
                     result[key] = "Not provided"
 
             return result
@@ -108,8 +130,8 @@ class AIEvaluator:
             }}
             """
 
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.openai_client.chat.completions.create(
+                model=self.openai_model,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
@@ -186,8 +208,8 @@ class AIEvaluator:
                 Additional Instructions: {evaluation_criteria.get('additional_instructions', '')}
                 """
 
-            response = self.client.chat.completions.create(
-                model=self.model,
+            response = self.openai_client.chat.completions.create(
+                model=self.openai_model,
                 messages=[{"role": "user", "content": evaluation_prompt}],
                 response_format={"type": "json_object"}
             )

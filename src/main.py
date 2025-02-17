@@ -79,12 +79,18 @@ def process_single_resume(resume_file, job_description, evaluation_criteria, com
         with col3:
             st.write("**Phone:**", candidate_info.get('phone', 'Not found'))
 
-        # Decision with color coding
+        # Decision and Justification with color coding
+        st.write("#### Evaluation Decision")
         result = evaluation.get('decision', '').upper()
-        if result == 'SHORTLIST':
-            st.success(f"Decision: {result}")
-        else:
-            st.error(f"Decision: {result}")
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            if result == 'SHORTLIST':
+                st.success(f"Decision: {result}")
+            else:
+                st.error(f"Decision: {result}")
+
+        with col2:
+            st.info(f"**Brief Justification:**\n{evaluation.get('justification', 'No justification provided')}")
 
         # Match score
         match_score = float(evaluation.get('match_score', 0))

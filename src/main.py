@@ -193,20 +193,24 @@ def show_home():
     try:
         db = st.session_state.components['db']
 
-        # First row of metrics
+        # First row of metrics - Active Jobs and Shortlisted
         col1, col2 = st.columns(2)
         with col1:
             active_jobs = db.get_active_jobs_count()
             st.metric("Active Job Descriptions", active_jobs)
             shortlisted = db.get_shortlisted_count()
             st.metric("Resumes Shortlisted", shortlisted)
-        with col2:
+
+        # Second row - Evaluations Today and Total Evaluations side by side
+        col1, col2 = st.columns(2)
+        with col1:
             today_evals = db.get_today_evaluations_count()
             st.metric("Evaluations Today", today_evals)
-            total_evals = db.get_total_evaluations_count()
-            st.metric("Total Resumes Evaluated", total_evals)
             rejected = db.get_rejected_count()
             st.metric("Resumes Rejected", rejected)
+        with col2:
+            total_evals = db.get_total_evaluations_count()
+            st.metric("Total Resumes Evaluated", total_evals)
 
     except Exception as e:
         st.error(f"Error loading dashboard metrics: {str(e)}")

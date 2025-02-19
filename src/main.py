@@ -11,7 +11,7 @@ from pdf_processor import PDFProcessor
 from docx_processor import DOCXProcessor
 from analytics import Analytics
 from utils import extract_text_from_upload
-from report_generator import generate_evaluation_report
+from report_generator import generate_evaluation_report, generate_summary_report # Added import for summary report generation
 
 # Configure logging
 logging.basicConfig(
@@ -179,12 +179,118 @@ def show_evaluation():
 
             # Process each resume sequentially
             success_count = 0
+            evaluation_results = []  # Store evaluation results
+            components = st.session_state.components
             for idx, uploaded_file in enumerate(uploaded_files, 1):
                 st.write(f"Processing resume {idx} of {len(uploaded_files)}: {uploaded_file.name}")
-                if process_single_resume(uploaded_file, job, criteria, st.session_state.components):
+                try:
+                    # Extract text based on file type
+                    file_extension = uploaded_file.name.lower().split('.')[-1]
+                    if file_extension == 'pdf':
+                        resume_text = components['pdf_processor'].extract_text(uploaded_file)
+                    elif file_extension == 'docx':
+                        resume_text = components['docx_processor'].extract_text(uploaded_file)
+                    else:
+                        raise Exception(f"Unsupported file format: {file_extension}")
+
+                    # Evaluate with AI
+                    evaluation = components['ai_evaluator'].evaluate_resume(
+                        resume_text,
+                        job,
+                        evaluation_criteria=criteria
+                    )
+
+                    # Store evaluation result
+                    evaluation_results.append(evaluation)
+
+                    # Save evaluation results
+                    components['db'].save_evaluation(
+                        job_id=job['id'],
+                        resume_name=uploaded_file.name,
+                        evaluation_result=evaluation,
+                        resume_file=uploaded_file
+                    )
+
+                    # Display individual result
+                    st.subheader(f"Results for {uploaded_file.name}")
+                    # Candidate Information
+                    st.write("#### Candidate Information")
+                    candidate_info = evaluation.get('candidate_info', {})
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.write("**Name:**", candidate_info.get('name', 'Not found'))
+                    with col2:
+                        st.write("**Email:**", candidate_info.get('email', 'Not found'))
+                    with col3:
+                        st.write("**Phone:**", candidate_info.get('phone', 'Not found'))
+
+                    # Decision and Justification with color coding
+                    st.write("#### Evaluation Decision")
+                    result = evaluation.get('decision', '').upper()
+                    col1, col2 = st.columns([1, 2])
+                    with col1:
+                        if result == 'SHORTLIST':
+                            st.success(f"Decision: {result}")
+                        else:
+                            st.error(f"Decision: {result}")
+
+                    with col2:
+                        st.info(f"**Brief Justification:**\n{evaluation.get('justification', 'No justification provided')}")
+
+                    # Match score
+                    match_score = float(evaluation.get('match_score', 0))
+                    st.write(f"Match Score: {match_score*100:.1f}%")
+                    st.progress(match_score)
+
+                    # Experience Analysis
+                    st.write("#### Experience Analysis")
+                    exp_data = evaluation.get('years_of_experience', {})
+                    cols = st.columns(3)
+                    with cols[0]:
+                        st.metric("Total Experience", f"{exp_data.get('total', 0)} years")
+                    with cols[1]:
+                        st.metric("Relevant Experience", f"{exp_data.get('relevant', 0)} years")
+                    with cols[2]:
+                        st.metric("Required Experience", f"{exp_data.get('required', 0)} years")
+
+                    # Download buttons
+                    st.write("#### Download Options")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        # Generate PDF report
+                        pdf_buffer = generate_evaluation_report(evaluation, uploaded_file.name)
+                        st.download_button(
+                            label="📄 Download Evaluation Report (PDF)",
+                            data=pdf_buffer,
+                            file_name=f"evaluation_{uploaded_file.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                            mime="application/pdf"
+                        )
+                    with col2:
+                        st.download_button(
+                            label="📥 Download Original Resume",
+                            data=uploaded_file.getvalue(),
+                            file_name=uploaded_file.name,
+                            mime=uploaded_file.type
+                        )
+
+                    st.markdown("---")
                     success_count += 1
+                except Exception as e:
+                    st.error(f"Error processing {uploaded_file.name}: {str(e)}")
+                    logger.error(f"Error processing resume: {str(e)}")
 
             st.success(f"Completed processing {success_count} out of {len(uploaded_files)} resumes!")
+
+            # Add Summary Report button
+            if success_count > 0:
+                st.write("#### Download Summary Report")
+                summary_buffer = generate_summary_report(evaluation_results)
+                st.download_button(
+                    label="📄 Download Shortlisted Candidates Summary (PDF)",
+                    data=summary_buffer,
+                    file_name=f"shortlisted_candidates_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf"
+                )
 
 def show_home():
     st.title("HR Assistant Dashboard")

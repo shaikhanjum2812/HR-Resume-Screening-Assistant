@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import re
 from datetime import datetime
 from typing import Dict, Any, Optional
 from openai import OpenAI, APIError
@@ -16,15 +17,11 @@ class AIEvaluator:
         try:
             self.openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
             self.anthropic_client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
-            # do not change this unless explicitly requested by the user
             self.openai_model = "gpt-4o"
-            # the newest Anthropic model is "claude-3-5-sonnet-20241022" which was released October 22, 2024
-            # do not change this unless explicitly requested by the user
             self.anthropic_model = "claude-3-5-sonnet-20241022"
             logger.info("AIEvaluator initialized successfully with both OpenAI and Anthropic")
         except Exception as e:
-            logger.error(f"Failed to initialize AIEvaluator: {e}")
+            logger.error(f"Failed to initialize AIEvaluator: {str(e)}")
             raise
 
     def _extract_candidate_info(self, resume_text: str) -> Dict[str, Any]:
@@ -105,6 +102,26 @@ class AIEvaluator:
                 "linkedin": "Not provided"
             }
 
+    def _extract_years_from_text(self, text: str) -> float:
+        """Extract numerical years from text description"""
+        try:
+            # Try to find a number followed by "years" or "year"
+            years_pattern = r'(\d+(?:\.\d+)?)\s*(?:years?|yrs?)'
+            match = re.search(years_pattern, text.lower())
+            if match:
+                return float(match.group(1))
+
+            # If no direct year mention, try to extract just the number
+            number_pattern = r'(\d+(?:\.\d+)?)'
+            match = re.search(number_pattern, text)
+            if match:
+                return float(match.group(1))
+
+            return 0.0
+        except Exception as e:
+            logger.error(f"Error extracting years from text: {e}")
+            return 0.0
+
     def _analyze_experience(self, resume_text: str, job_description: str, min_years: int = 0) -> Dict[str, Any]:
         """Analyze candidate's experience"""
         try:
@@ -121,13 +138,14 @@ class AIEvaluator:
 
             Provide a detailed analysis in JSON format:
             {{
-                "total": "total years of experience",
-                "relevant": "years of relevant experience",
-                "required": {min_years},
-                "meets_requirement": true/false,
-                "details": "detailed analysis of experience",
+                "total_years": "Numeric value only (e.g., 5.5)",
+                "relevant_years": "Numeric value only (e.g., 3.0)",
+                "experience_details": "detailed analysis of experience",
                 "quality_score": "score between 0 and 1"
             }}
+
+            Important: For total_years and relevant_years, provide ONLY the numeric value, no text description.
+            Example: "total_years": "5.5" (not "5.5 years" or "5 years and 6 months")
             """
 
             response = self.openai_client.chat.completions.create(
@@ -136,16 +154,33 @@ class AIEvaluator:
                 response_format={"type": "json_object"}
             )
 
-            return json.loads(response.choices[0].message.content)
+            result = json.loads(response.choices[0].message.content)
+
+            # Convert experience values to float and ensure they're numeric
+            total_years = self._extract_years_from_text(str(result.get('total_years', '0')))
+            relevant_years = self._extract_years_from_text(str(result.get('relevant_years', '0')))
+
+            # Ensure quality score is a float between 0 and 1
+            quality_score = float(result.get('quality_score', 0))
+            quality_score = max(0.0, min(1.0, quality_score))
+
+            return {
+                "total": total_years,
+                "relevant": relevant_years,
+                "required": float(min_years),
+                "meets_requirement": relevant_years >= float(min_years),
+                "details": result.get('experience_details', 'No details provided'),
+                "quality_score": quality_score
+            }
         except Exception as e:
             logger.error(f"Failed to analyze experience: {e}")
             return {
-                "total": 0,
-                "relevant": 0,
-                "required": min_years,
+                "total": 0.0,
+                "relevant": 0.0,
+                "required": float(min_years),
                 "meets_requirement": False,
                 "details": "Failed to analyze experience",
-                "quality_score": 0
+                "quality_score": 0.0
             }
 
     def evaluate_resume(self, resume_text: str, job_description: str, evaluation_criteria: Optional[Dict] = None) -> Dict[str, Any]:

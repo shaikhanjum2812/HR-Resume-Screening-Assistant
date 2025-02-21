@@ -605,26 +605,6 @@ def show_analytics():
                 use_container_width=True
             )
 
-        # Detailed insights section
-        st.subheader("Detailed Insights")
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.write("##### Top Skills")
-            if data['top_skills']:
-                for skill, count in data['top_skills'].items():
-                    st.write(f"- {skill}: {count}")
-            else:
-                st.info("No skill data available for the selected period")
-
-        with col2:
-            st.write("##### Education Levels")
-            if data['education_levels']:
-                for edu, count in data['education_levels'].items():
-                    st.write(f"- {edu}: {count}")
-            else:
-                st.info("No education data available for the selected period")
-
     except Exception as e:
         st.error(f"Error loading analytics dashboard: {str(e)}")
         logger.error(f"Analytics dashboard error: {str(e)}")

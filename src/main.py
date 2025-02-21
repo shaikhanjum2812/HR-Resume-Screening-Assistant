@@ -494,27 +494,74 @@ def show_jobs():
 def show_analytics():
     st.title("Analytics Dashboard")
 
-    # Time period selection
-    period = st.selectbox("Select Time Period", ["Week", "Month", "Year"])
+    # Add date range filter
+    col1, col2 = st.columns(2)
+    with col1:
+        period = st.selectbox(
+            "Select Time Period",
+            ["Week", "Month", "Quarter", "Year"],
+            help="Filter data based on time period"
+        )
 
     # Get analytics data
     data = st.session_state.components['analytics'].get_evaluation_stats(period.lower())
 
-    # Display metrics
-    col1, col2, col3 = st.columns(3)
+    # Top section: Key Metrics
+    st.subheader("Key Metrics")
+    col1, col2, col3, col4 = st.columns(4)
+
     with col1:
         st.metric("Total Evaluations", data['total_evaluations'])
     with col2:
         st.metric("Shortlisted", data['shortlisted'])
     with col3:
         st.metric("Rejection Rate", f"{data['rejection_rate']:.1f}%")
+    with col4:
+        st.metric("Avg Experience", f"{data['avg_experience']} years")
 
-    # Display charts
+    # Middle section: Visualizations
     st.subheader("Evaluation Trends")
-    st.plotly_chart(st.session_state.components['analytics'].plot_evaluation_trend(period.lower()))
 
-    st.subheader("Job-wise Distribution")
-    st.plotly_chart(st.session_state.components['analytics'].plot_job_distribution())
+    # Create tabs for different visualizations
+    tab1, tab2, tab3 = st.tabs(["Timeline", "Job Distribution", "Experience Distribution"])
+
+    with tab1:
+        st.plotly_chart(
+            st.session_state.components['analytics'].plot_evaluation_trend(period.lower()),
+            use_container_width=True
+        )
+
+    with tab2:
+        st.plotly_chart(
+            st.session_state.components['analytics'].plot_job_distribution(),
+            use_container_width=True
+        )
+
+    with tab3:
+        st.plotly_chart(
+            st.session_state.components['analytics'].plot_experience_distribution(),
+            use_container_width=True
+        )
+
+    # Bottom section: Detailed Insights
+    st.subheader("Detailed Insights")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("##### Top Skills")
+        if data['top_skills']:
+            for skill, count in data['top_skills'].items():
+                st.write(f"- {skill}: {count}")
+        else:
+            st.info("No skill data available")
+
+    with col2:
+        st.write("##### Education Levels")
+        if data['education_levels']:
+            for edu, count in data['education_levels'].items():
+                st.write(f"- {edu}: {count}")
+        else:
+            st.info("No education data available")
 
 def format_evaluation_as_text(evaluation_data):
     """Convert evaluation data to a readable text format"""

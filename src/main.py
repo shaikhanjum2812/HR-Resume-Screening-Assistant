@@ -299,20 +299,24 @@ def show_home():
     try:
         db = st.session_state.components['db']
 
-        # Create two rows of metrics with consistent layout
-        # First row - Overview metrics
-        st.subheader("Overview")
+        # First row - Overview stats
+        st.subheader("Overview Stats")
         col1, col2, col3 = st.columns(3)
-
         with col1:
             active_jobs = db.get_active_jobs_count()
             st.metric(
-                "Active Job Descriptions", 
+                "Active Jobs", 
                 active_jobs,
                 help="Number of currently active job positions"
             )
-
         with col2:
+            total_evals = db.get_total_evaluations_count()
+            st.metric(
+                "Total Evaluations", 
+                total_evals,
+                help="Total number of resumes evaluated"
+            )
+        with col3:
             today_evals = db.get_today_evaluations_count()
             st.metric(
                 "Today's Evaluations", 
@@ -320,31 +324,23 @@ def show_home():
                 help="Number of resumes evaluated today"
             )
 
-        with col3:
-            total_evals = db.get_total_evaluations_count()
-            st.metric(
-                "Total Evaluations", 
-                total_evals,
-                help="Total number of resumes evaluated"
-            )
-
-        # Second row - Detailed metrics
-        st.subheader("Evaluation Status")
+        # Second row - Evaluation metrics
+        st.subheader("Evaluation Metrics")
         col1, col2 = st.columns(2)
-
         with col1:
             shortlisted = db.get_shortlisted_count()
+            shortlist_rate = (shortlisted / total_evals * 100) if total_evals > 0 else 0
             st.metric(
-                "Shortlisted Candidates", 
+                "Shortlisted", 
                 shortlisted,
+                f"{shortlist_rate:.1f}% success rate",
                 help="Number of candidates shortlisted"
             )
-
         with col2:
             rejected = db.get_rejected_count()
             rejection_rate = (rejected / total_evals * 100) if total_evals > 0 else 0
             st.metric(
-                "Rejected Candidates", 
+                "Rejected", 
                 rejected,
                 f"{rejection_rate:.1f}% rejection rate",
                 help="Number of candidates rejected"
@@ -524,8 +520,8 @@ def show_jobs():
 def show_analytics():
     st.title("Analytics Dashboard")
 
-    # Time period filter in a more compact layout
-    col1, _ = st.columns([1, 3])  # Use remaining space for future filters
+    # Time period filter
+    col1, _ = st.columns([1, 3])
     with col1:
         period = st.selectbox(
             "Select Time Period",
@@ -534,57 +530,55 @@ def show_analytics():
         )
 
     try:
-        # Get analytics data
         data = st.session_state.components['analytics'].get_evaluation_stats(period.lower())
 
-        # Top section: Key Metrics with consistent layout
-        st.subheader("Key Metrics")
-
-        # First row of metrics
+        # First row - Overview metrics
+        st.subheader("Overview Metrics")
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric(
                 "Total Evaluations", 
                 data['total_evaluations'],
-                help="Total number of evaluations in selected period"
+                help="Total evaluations in selected period"
             )
         with col2:
-            st.metric(
-                "Shortlisted", 
-                data['shortlisted'],
-                help="Number of candidates shortlisted"
-            )
-        with col3:
-            st.metric(
-                "Rejection Rate", 
-                f"{data['rejection_rate']:.1f}%",
-                help="Percentage of candidates rejected"
-            )
-
-        # Second row of metrics
-        col1, col2, col3 = st.columns(3)
-        with col1:
             st.metric(
                 "Average Experience", 
                 f"{data['avg_experience']} years",
-                help="Average years of experience of candidates"
-            )
-        with col2:
-            shortlist_rate = 100 - data['rejection_rate']
-            st.metric(
-                "Shortlist Rate", 
-                f"{shortlist_rate:.1f}%",
-                help="Percentage of candidates shortlisted"
+                help="Average years of experience"
             )
         with col3:
             today_count = st.session_state.components['db'].get_today_evaluations_count()
             st.metric(
                 "Today's Evaluations", 
                 today_count,
-                help="Number of evaluations performed today"
+                help="Evaluations performed today"
             )
 
-        # Middle section: Visualizations
+        # Second row - Success metrics
+        st.subheader("Success Metrics")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                "Shortlisted", 
+                data['shortlisted'],
+                help="Candidates shortlisted"
+            )
+        with col2:
+            shortlist_rate = 100 - data['rejection_rate']
+            st.metric(
+                "Success Rate", 
+                f"{shortlist_rate:.1f}%",
+                help="Percentage shortlisted"
+            )
+        with col3:
+            st.metric(
+                "Rejection Rate", 
+                f"{data['rejection_rate']:.1f}%",
+                help="Percentage rejected"
+            )
+
+        # Visualizations section
         st.subheader("Evaluation Analysis")
         tab1, tab2, tab3 = st.tabs(["Timeline", "Job Distribution", "Experience Distribution"])
 
@@ -606,7 +600,7 @@ def show_analytics():
                 use_container_width=True
             )
 
-        # Bottom section: Detailed Insights with improved layout
+        # Detailed insights section
         st.subheader("Detailed Insights")
         col1, col2 = st.columns(2)
 

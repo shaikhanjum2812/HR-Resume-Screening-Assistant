@@ -299,52 +299,57 @@ def show_home():
     try:
         db = st.session_state.components['db']
 
-        # First row - Overview stats
+        # First row - Overview stats in one line
         st.subheader("Overview Stats")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            active_jobs = db.get_active_jobs_count()
-            st.metric(
-                "Active Jobs", 
-                active_jobs,
-                help="Number of currently active job positions"
-            )
-        with col2:
-            total_evals = db.get_total_evaluations_count()
-            st.metric(
-                "Total Evaluations", 
-                total_evals,
-                help="Total number of resumes evaluated"
-            )
-        with col3:
-            today_evals = db.get_today_evaluations_count()
-            st.metric(
-                "Today's Evaluations", 
-                today_evals,
-                help="Number of resumes evaluated today"
-            )
+        metrics_row1 = st.container()
+        with metrics_row1:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                active_jobs = db.get_active_jobs_count()
+                st.metric(
+                    "Active Jobs", 
+                    active_jobs,
+                    help="Number of currently active job positions"
+                )
+            with col2:
+                total_evals = db.get_total_evaluations_count()
+                st.metric(
+                    "Total Evaluations", 
+                    total_evals,
+                    help="Total number of resumes evaluated"
+                )
+            with col3:
+                today_evals = db.get_today_evaluations_count()
+                st.metric(
+                    "Today's Evaluations", 
+                    today_evals,
+                    help="Number of resumes evaluated today"
+                )
 
-        # Second row - Evaluation metrics
+        # Second row - Evaluation metrics aligned
+        st.markdown("---")  # Add separator for visual clarity
         st.subheader("Evaluation Metrics")
-        col1, col2 = st.columns(2)
-        with col1:
-            shortlisted = db.get_shortlisted_count()
-            shortlist_rate = (shortlisted / total_evals * 100) if total_evals > 0 else 0
-            st.metric(
-                "Shortlisted", 
-                shortlisted,
-                f"{shortlist_rate:.1f}% success rate",
-                help="Number of candidates shortlisted"
-            )
-        with col2:
-            rejected = db.get_rejected_count()
-            rejection_rate = (rejected / total_evals * 100) if total_evals > 0 else 0
-            st.metric(
-                "Rejected", 
-                rejected,
-                f"{rejection_rate:.1f}% rejection rate",
-                help="Number of candidates rejected"
-            )
+        metrics_row2 = st.container()
+        with metrics_row2:
+            col1, col2 = st.columns(2)
+            with col1:
+                shortlisted = db.get_shortlisted_count()
+                shortlist_rate = (shortlisted / total_evals * 100) if total_evals > 0 else 0
+                st.metric(
+                    "Shortlisted", 
+                    shortlisted,
+                    f"{shortlist_rate:.1f}% success rate",
+                    help="Number of candidates shortlisted"
+                )
+            with col2:
+                rejected = db.get_rejected_count()
+                rejection_rate = (rejected / total_evals * 100) if total_evals > 0 else 0
+                st.metric(
+                    "Rejected", 
+                    rejected,
+                    f"{rejection_rate:.1f}% rejection rate",
+                    help="Number of candidates rejected"
+                )
 
     except Exception as e:
         st.error(f"Error loading dashboard metrics: {str(e)}")

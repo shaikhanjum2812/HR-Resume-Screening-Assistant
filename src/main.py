@@ -299,26 +299,56 @@ def show_home():
     try:
         db = st.session_state.components['db']
 
-        # First row of metrics - Active Jobs and (Evaluations Today + Total Evaluations)
-        col1, col2, col3 = st.columns([1, 1, 1])
+        # Create two rows of metrics with consistent layout
+        # First row - Overview metrics
+        st.subheader("Overview")
+        col1, col2, col3 = st.columns(3)
+
         with col1:
             active_jobs = db.get_active_jobs_count()
-            st.metric("Active Job Descriptions", active_jobs)
+            st.metric(
+                "Active Job Descriptions", 
+                active_jobs,
+                help="Number of currently active job positions"
+            )
+
         with col2:
             today_evals = db.get_today_evaluations_count()
-            st.metric("Evaluations Today", today_evals)
+            st.metric(
+                "Today's Evaluations", 
+                today_evals,
+                help="Number of resumes evaluated today"
+            )
+
         with col3:
             total_evals = db.get_total_evaluations_count()
-            st.metric("Total Resumes Evaluated", total_evals)
+            st.metric(
+                "Total Evaluations", 
+                total_evals,
+                help="Total number of resumes evaluated"
+            )
 
-        # Second row - Shortlisted under Active Jobs, Rejected under Evaluations Today
-        col1, col2 = st.columns([1, 2])
+        # Second row - Detailed metrics
+        st.subheader("Evaluation Status")
+        col1, col2 = st.columns(2)
+
         with col1:
             shortlisted = db.get_shortlisted_count()
-            st.metric("Resumes Shortlisted", shortlisted)
+            st.metric(
+                "Shortlisted Candidates", 
+                shortlisted,
+                help="Number of candidates shortlisted"
+            )
+
         with col2:
             rejected = db.get_rejected_count()
-            st.metric("Resumes Rejected", rejected)
+            rejection_rate = (rejected / total_evals * 100) if total_evals > 0 else 0
+            st.metric(
+                "Rejected Candidates", 
+                rejected,
+                f"{rejection_rate:.1f}% rejection rate",
+                help="Number of candidates rejected"
+            )
 
     except Exception as e:
         st.error(f"Error loading dashboard metrics: {str(e)}")
@@ -494,8 +524,8 @@ def show_jobs():
 def show_analytics():
     st.title("Analytics Dashboard")
 
-    # Add date range filter
-    col1, col2 = st.columns(2)
+    # Time period filter in a more compact layout
+    col1, _ = st.columns([1, 3])  # Use remaining space for future filters
     with col1:
         period = st.selectbox(
             "Select Time Period",
@@ -503,65 +533,102 @@ def show_analytics():
             help="Filter data based on time period"
         )
 
-    # Get analytics data
-    data = st.session_state.components['analytics'].get_evaluation_stats(period.lower())
+    try:
+        # Get analytics data
+        data = st.session_state.components['analytics'].get_evaluation_stats(period.lower())
 
-    # Top section: Key Metrics
-    st.subheader("Key Metrics")
-    col1, col2, col3, col4 = st.columns(4)
+        # Top section: Key Metrics with consistent layout
+        st.subheader("Key Metrics")
 
-    with col1:
-        st.metric("Total Evaluations", data['total_evaluations'])
-    with col2:
-        st.metric("Shortlisted", data['shortlisted'])
-    with col3:
-        st.metric("Rejection Rate", f"{data['rejection_rate']:.1f}%")
-    with col4:
-        st.metric("Avg Experience", f"{data['avg_experience']} years")
+        # First row of metrics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                "Total Evaluations", 
+                data['total_evaluations'],
+                help="Total number of evaluations in selected period"
+            )
+        with col2:
+            st.metric(
+                "Shortlisted", 
+                data['shortlisted'],
+                help="Number of candidates shortlisted"
+            )
+        with col3:
+            st.metric(
+                "Rejection Rate", 
+                f"{data['rejection_rate']:.1f}%",
+                help="Percentage of candidates rejected"
+            )
 
-    # Middle section: Visualizations
-    st.subheader("Evaluation Trends")
+        # Second row of metrics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                "Average Experience", 
+                f"{data['avg_experience']} years",
+                help="Average years of experience of candidates"
+            )
+        with col2:
+            shortlist_rate = 100 - data['rejection_rate']
+            st.metric(
+                "Shortlist Rate", 
+                f"{shortlist_rate:.1f}%",
+                help="Percentage of candidates shortlisted"
+            )
+        with col3:
+            today_count = st.session_state.components['db'].get_today_evaluations_count()
+            st.metric(
+                "Today's Evaluations", 
+                today_count,
+                help="Number of evaluations performed today"
+            )
 
-    # Create tabs for different visualizations
-    tab1, tab2, tab3 = st.tabs(["Timeline", "Job Distribution", "Experience Distribution"])
+        # Middle section: Visualizations
+        st.subheader("Evaluation Analysis")
+        tab1, tab2, tab3 = st.tabs(["Timeline", "Job Distribution", "Experience Distribution"])
 
-    with tab1:
-        st.plotly_chart(
-            st.session_state.components['analytics'].plot_evaluation_trend(period.lower()),
-            use_container_width=True
-        )
+        with tab1:
+            st.plotly_chart(
+                st.session_state.components['analytics'].plot_evaluation_trend(period.lower()),
+                use_container_width=True
+            )
 
-    with tab2:
-        st.plotly_chart(
-            st.session_state.components['analytics'].plot_job_distribution(),
-            use_container_width=True
-        )
+        with tab2:
+            st.plotly_chart(
+                st.session_state.components['analytics'].plot_job_distribution(),
+                use_container_width=True
+            )
 
-    with tab3:
-        st.plotly_chart(
-            st.session_state.components['analytics'].plot_experience_distribution(),
-            use_container_width=True
-        )
+        with tab3:
+            st.plotly_chart(
+                st.session_state.components['analytics'].plot_experience_distribution(),
+                use_container_width=True
+            )
 
-    # Bottom section: Detailed Insights
-    st.subheader("Detailed Insights")
-    col1, col2 = st.columns(2)
+        # Bottom section: Detailed Insights with improved layout
+        st.subheader("Detailed Insights")
+        col1, col2 = st.columns(2)
 
-    with col1:
-        st.write("##### Top Skills")
-        if data['top_skills']:
-            for skill, count in data['top_skills'].items():
-                st.write(f"- {skill}: {count}")
-        else:
-            st.info("No skill data available")
+        with col1:
+            st.write("##### Top Skills")
+            if data['top_skills']:
+                for skill, count in data['top_skills'].items():
+                    st.write(f"- {skill}: {count}")
+            else:
+                st.info("No skill data available for the selected period")
 
-    with col2:
-        st.write("##### Education Levels")
-        if data['education_levels']:
-            for edu, count in data['education_levels'].items():
-                st.write(f"- {edu}: {count}")
-        else:
-            st.info("No education data available")
+        with col2:
+            st.write("##### Education Levels")
+            if data['education_levels']:
+                for edu, count in data['education_levels'].items():
+                    st.write(f"- {edu}: {count}")
+            else:
+                st.info("No education data available for the selected period")
+
+    except Exception as e:
+        st.error(f"Error loading analytics dashboard: {str(e)}")
+        logger.error(f"Analytics dashboard error: {str(e)}")
 
 def format_evaluation_as_text(evaluation_data):
     """Convert evaluation data to a readable text format"""

@@ -19,6 +19,10 @@ author = "agent"
 task = "workflow.run"
 args = "HR Assistant"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Streamlit App"
+
 [[workflows.workflow]]
 name = "HR Assistant"
 author = "agent"
@@ -34,6 +38,21 @@ task = "shell.exec"
 args = "python3 -m streamlit run src/main.py"
 waitForPort = 5000
 
+[[workflows.workflow]]
+name = "Streamlit App"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run main.py"
+waitForPort = 8501
+
 [[ports]]
 localPort = 5000
 externalPort = 80
@@ -41,3 +60,7 @@ externalPort = 80
 [[ports]]
 localPort = 5001
 externalPort = 3000
+
+[[ports]]
+localPort = 8501
+externalPort = 3001

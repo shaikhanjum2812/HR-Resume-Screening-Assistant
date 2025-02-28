@@ -215,7 +215,6 @@ class AIEvaluator:
                 }},
                 "missing_requirements": ["list of missing requirements"],
                 "evaluation_metrics": {{
-                    "technical_skills": "score between 0 and 1",
                     "experience_relevance": "score between 0 and 1",
                     "education_match": "score between 0 and 1",
                     "overall_fit": "score between 0 and 1"

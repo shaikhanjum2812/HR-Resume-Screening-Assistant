@@ -252,7 +252,6 @@ class Database:
             json.dumps(evaluation_result['key_matches']),
             json.dumps(evaluation_result['missing_requirements']),
             evaluation_result['years_of_experience'].get('details', ''),
-            evaluation_metrics.get('technical_skills', 0.0),
             evaluation_metrics.get('experience_relevance', 0.0),
             evaluation_metrics.get('education_match', 0.0),
             evaluation_metrics.get('overall_fit', 0.0),

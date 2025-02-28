@@ -208,7 +208,7 @@ class Database:
                 result, justification, match_score, confidence_score,
                 years_experience_total, years_experience_relevant, years_experience_required,
                 meets_experience_requirement, key_matches, missing_requirements,
-                experience_analysis, education_match_score, overall_fit_score, interview_focus, skill_gaps,
+                experience_analysis, overall_fit_score, interview_focus, skill_gaps,
                 technical_depth, problem_solving_score, project_complexity_score,
                 implementation_experience_score, project_expertise_score,
                 experience_quality_score,
@@ -216,7 +216,7 @@ class Database:
                 resume_file_data, resume_file_type
             ) VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             )
         '''
 
@@ -251,7 +251,6 @@ class Database:
             json.dumps(evaluation_result['key_matches']),
             json.dumps(evaluation_result['missing_requirements']),
             evaluation_result['years_of_experience'].get('details', ''),
-            evaluation_metrics.get('education_match', 0.0),
             evaluation_metrics.get('overall_fit', 0.0),
             json.dumps(recommendations.get('interview_focus', [])),
             json.dumps(recommendations.get('skill_gaps', [])),

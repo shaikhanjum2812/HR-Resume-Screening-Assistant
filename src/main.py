@@ -840,4 +840,9 @@ def main():
         st.error(f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
-    main()
+    try:
+        logger.info("Starting HR Assistant application...")
+        main()
+    except Exception as e:
+        logger.error(f"Application startup error: {str(e)}")
+        st.error("Failed to start the application. Please check the logs.")

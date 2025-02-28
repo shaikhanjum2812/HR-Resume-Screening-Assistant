@@ -215,7 +215,6 @@ class AIEvaluator:
                 }},
                 "missing_requirements": ["list of missing requirements"],
                 "evaluation_metrics": {{
-                    "education_match": "score between 0 and 1",
                     "overall_fit": "score between 0 and 1"
                 }},
                 "recommendations": {{

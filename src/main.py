@@ -5,16 +5,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import json
-
-# Add src directory to Python path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.database import Database
-from src.ai_evaluator import AIEvaluator
-from src.pdf_processor import PDFProcessor
-from src.docx_processor import DOCXProcessor
-from src.analytics import Analytics
-from src.utils import extract_text_from_upload
-from src.report_generator import generate_evaluation_report, generate_summary_report # Added import for summary report generation
+from database import Database
+from ai_evaluator import AIEvaluator
+from pdf_processor import PDFProcessor
+from docx_processor import DOCXProcessor
+from analytics import Analytics
+from utils import extract_text_from_upload
+from report_generator import generate_evaluation_report, generate_summary_report # Added import for summary report generation
 
 # Configure logging
 logging.basicConfig(

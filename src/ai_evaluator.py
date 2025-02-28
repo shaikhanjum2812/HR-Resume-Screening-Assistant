@@ -215,10 +215,9 @@ class AIEvaluator:
                 }},
                 "missing_requirements": ["list of missing requirements"],
                 "evaluation_metrics": {{
+                    "experience_relevance": "score between 0 and 1",
                     "education_match": "score between 0 and 1",
-                    "overall_fit": "score between 0 and 1",
-                    "implementation_experience": "score between 0 and 1",
-                    "project_expertise": "score between 0 and 1"
+                    "overall_fit": "score between 0 and 1"
                 }},
                 "recommendations": {{
                     "interview_focus": ["areas to focus on in interview"],

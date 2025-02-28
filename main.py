@@ -3,8 +3,7 @@ import sys
 import streamlit as st
 
 # Add the src directory to the Python path
-src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
-sys.path.append(src_path)
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src'))
 
 # Import the main application code
 from src.main import show_home, show_jobs, show_evaluation, show_analytics, initialize_components

@@ -10,29 +10,47 @@ from contextlib import contextmanager
 logger = logging.getLogger(__name__)
 
 class Database:
-    def __init__(self):
+    def __init__(self, require_db=False):
         """Initialize the Database with connection pool"""
+        self.pool = None
         try:
-            # Create a connection pool instead of a single connection
+            database_url = os.environ.get('DATABASE_URL')
+            if not database_url:
+                logger.warning("DATABASE_URL not found in environment variables")
+                if require_db:
+                    raise ValueError("DATABASE_URL environment variable is required but not set")
+                return
+
+            logger.info("Attempting to establish database connection...")
             self.pool = SimpleConnectionPool(
                 minconn=1,
                 maxconn=10,
-                dsn=os.environ['DATABASE_URL']
+                dsn=database_url
             )
             self.create_tables()
             logger.info("Database connection and tables initialized successfully")
         except Exception as e:
-            logger.error(f"Database initialization error: {e}")
-            raise
+            logger.error(f"Database initialization error: {str(e)}")
+            if require_db:
+                raise
+            else:
+                logger.warning("Continuing without database connection")
 
     @contextmanager
     def get_connection(self):
         """Context manager for database connections"""
+        if not self.pool:
+            raise RuntimeError("Database connection not initialized")
+
         conn = self.pool.getconn()
         try:
             yield conn
         finally:
             self.pool.putconn(conn)
+
+    def is_connected(self):
+        """Check if database is connected"""
+        return self.pool is not None
 
     def create_tables(self):
         """Create necessary database tables if they don't exist"""

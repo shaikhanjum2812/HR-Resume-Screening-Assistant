@@ -214,9 +214,6 @@ class AIEvaluator:
                     "projects": ["relevant projects"]
                 }},
                 "missing_requirements": ["list of missing requirements"],
-                "evaluation_metrics": {{
-                    "overall_fit": "score between 0 and 1"
-                }},
                 "recommendations": {{
                     "interview_focus": ["areas to focus on in interview"],
                     "skill_gaps": ["identified skill gaps"]

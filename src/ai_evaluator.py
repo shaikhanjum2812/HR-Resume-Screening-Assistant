@@ -220,17 +220,40 @@ class AIEvaluator:
             # Extract candidate information
             candidate_info = self._extract_candidate_info(resume_text)
 
-            # Get experience requirements
-            min_years = int(evaluation_criteria.get('min_years_experience', 0)) if evaluation_criteria else 0
-            logger.info(f"Minimum years required: {min_years}")
+            # Get experience requirements and ensure it's an integer
+            min_years = evaluation_criteria.get('min_years_experience', 0) if evaluation_criteria else 0
+            if isinstance(min_years, str):
+                try:
+                    min_years = int(min_years)
+                except ValueError:
+                    min_years = 0
+            elif not isinstance(min_years, (int, float)):
+                min_years = 0
+
+            logger.info(f"Required minimum years of experience: {min_years}")
 
             # Analyze experience
             experience_analysis = self._analyze_experience(resume_text, job_description, min_years)
 
-            # Evaluate against job requirements
+            # Log the experience analysis
+            logger.info(f"Experience analysis results: {json.dumps(experience_analysis, indent=2)}")
+
+            # Update the experience requirements in the evaluation prompt
             evaluation_prompt = f"""
             Evaluate the candidate's resume against the job requirements.
             The position requires a minimum of {min_years} years of experience.
+
+            Job Description:
+            {job_description}
+
+            Resume:
+            {resume_text}
+
+            Experience Analysis:
+            - Total Years: {experience_analysis['total']}
+            - Relevant Years: {experience_analysis['relevant']}
+            - Required Years: {experience_analysis['required']}
+            - Meets Requirement: {experience_analysis['meets_requirement']}
 
             Provide a detailed evaluation in JSON format:
             {{
@@ -247,18 +270,8 @@ class AIEvaluator:
                     "experience_relevance": "score between 0 and 1",
                     "education_match": "score between 0 and 1",
                     "overall_fit": "score between 0 and 1"
-                }},
-                "recommendations": {{
-                    "interview_focus": ["areas to focus on in interview"],
-                    "skill_gaps": ["identified skill gaps"]
                 }}
             }}
-
-            Job Description:
-            {job_description}
-
-            Resume:
-            {resume_text}
             """
 
             if evaluation_criteria:
@@ -271,6 +284,7 @@ class AIEvaluator:
                 Additional Instructions: {evaluation_criteria.get('additional_instructions', '')}
                 """
 
+            # Get the evaluation result
             response = self.openai_client.chat.completions.create(
                 model=self.openai_model,
                 messages=[{"role": "user", "content": evaluation_prompt}],

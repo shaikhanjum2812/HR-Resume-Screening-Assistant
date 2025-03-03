@@ -147,29 +147,39 @@ class Database:
         return self.execute_query('DELETE FROM evaluations', fetch=False)
 
     def add_job_description(self, title, description, evaluation_criteria=None):
+        """Add a new job description with evaluation criteria"""
         query = 'INSERT INTO job_descriptions (title, description) VALUES (%s, %s) RETURNING id'
         job_id = self.execute_query(query, (title, description))[0][0]
 
         if evaluation_criteria:
+            # Ensure min_years_experience is properly handled
+            min_years = evaluation_criteria.get('min_years_experience')
+            if isinstance(min_years, str):
+                try:
+                    min_years = int(min_years)
+                except ValueError:
+                    min_years = 0
+            elif not isinstance(min_years, int):
+                min_years = 0
+
             query = '''
                 INSERT INTO evaluation_criteria (
                     job_id, min_years_experience, required_skills,
                     preferred_skills, education_requirements,
-                    company_background_requirements, domain_experience_requirements,
-                    additional_instructions
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    domain_experience_requirements, additional_instructions
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
             '''
             params = (
                 job_id,
-                evaluation_criteria.get('min_years_experience', 0),
+                min_years,
                 json.dumps(evaluation_criteria.get('required_skills', [])),
                 json.dumps(evaluation_criteria.get('preferred_skills', [])),
                 evaluation_criteria.get('education_requirements', ''),
-                evaluation_criteria.get('company_background_requirements', ''),
                 evaluation_criteria.get('domain_experience_requirements', ''),
                 evaluation_criteria.get('additional_instructions', '')
             )
             self.execute_query(query, params, fetch=False)
+            logger.info(f"Added job {job_id} with {min_years} years required experience")
 
         return job_id
 

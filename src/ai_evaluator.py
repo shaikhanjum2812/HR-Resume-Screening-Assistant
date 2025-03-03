@@ -29,39 +29,33 @@ class AIEvaluator:
         try:
             logger.info("Extracting candidate information using Claude")
             prompt = f"""
-            You are a professional resume parser. Analyze this resume very carefully and extract key information.
-            Focus on accuracy and completeness. Use exact matches from the text, don't paraphrase.
+            You are a professional resume parser. Your task is to carefully extract the following information from the resume text.
+            You must find:
+            1. Full Name (usually at the top)
+            2. Email Address (in standard format like example@domain.com)
+            3. Phone Number (any format, standardize if possible)
+            4. Location (city/state/country)
+            5. LinkedIn URL (if available)
 
-            Required Information to Extract:
-            1. Full Name: Must be the candidate's complete name as written
-            2. Email: Must be a valid email format (e.g., name@domain.com)
-            3. Phone: Extract complete number, maintain original format
-            4. Location: Current location including city/state/country
-            5. LinkedIn: Complete LinkedIn profile URL if present
-            6. Education: Highest degree and field of study
-            7. Total Years of Experience: Calculate from work history
-            8. Key Skills: List of primary technical and professional skills
+            Rules:
+            - If a field is not directly visible, try to infer it from context (e.g., name from email)
+            - NEVER return null, None, or empty values
+            - If information is truly not found, use "Not provided"
+            - Be thorough in your search and consider all parts of the resume
+            - Format phone numbers consistently when found
+            - Return exact matches when found, don't paraphrase
 
             Resume text to analyze:
             {resume_text}
 
-            Return the information in this exact JSON format:
+            Provide the information in this exact JSON format:
             {{
-                "name": "extracted full name",
-                "email": "extracted email",
-                "phone": "extracted phone",
-                "location": "extracted location",
-                "linkedin": "extracted linkedin url",
-                "education": "extracted education details",
-                "total_experience": "calculated years",
-                "key_skills": ["skill1", "skill2", "skill3"]
+                "name": "Full Name",
+                "email": "email@address.com",
+                "phone": "Phone Number",
+                "location": "City, State/Country",
+                "linkedin": "LinkedIn Profile URL"
             }}
-
-            Rules:
-            - Extract EXACT text from resume, don't modify or standardize
-            - If information isn't found, use "Not provided"
-            - For experience, calculate total years from work history
-            - Include ALL skills mentioned in technical skills or core competencies sections
             """
 
             # First try with Anthropic
@@ -77,31 +71,25 @@ class AIEvaluator:
                     ]
                 )
                 result = json.loads(response.content)
-                logger.info("Successfully parsed resume with Anthropic")
             except Exception as e:
                 logger.warning(f"Anthropic extraction failed, falling back to OpenAI: {e}")
                 # Fallback to OpenAI
                 response = self.openai_client.chat.completions.create(
                     model=self.openai_model,
                     messages=[
-                        {"role": "system", "content": "You are a resume parsing expert focused on accurate information extraction."},
+                        {"role": "system", "content": "You are a resume parser expert. Be thorough in extracting contact information."},
                         {"role": "user", "content": prompt}
                     ],
                     response_format={"type": "json_object"}
                 )
                 result = json.loads(response.choices[0].message.content)
-                logger.info("Successfully parsed resume with OpenAI fallback")
+
+            logger.info("Successfully extracted candidate information")
 
             # Validate and clean results
-            for key in ['name', 'email', 'phone', 'location', 'linkedin', 'education', 'total_experience']:
+            for key in ['name', 'email', 'phone', 'location', 'linkedin']:
                 if key not in result or not result[key] or result[key].lower() in ['none', 'null', '']:
                     result[key] = "Not provided"
-
-            if 'key_skills' not in result or not isinstance(result['key_skills'], list):
-                result['key_skills'] = []
-
-            # Log the extracted information for debugging
-            logger.info(f"Extracted candidate information: {json.dumps(result, indent=2)}")
 
             return result
         except Exception as e:
@@ -111,10 +99,7 @@ class AIEvaluator:
                 "email": "Not provided",
                 "phone": "Not provided",
                 "location": "Not provided",
-                "linkedin": "Not provided",
-                "education": "Not provided",
-                "total_experience": "Not provided",
-                "key_skills": []
+                "linkedin": "Not provided"
             }
 
     def _extract_years_from_text(self, text: str) -> float:
@@ -143,7 +128,7 @@ class AIEvaluator:
             logger.info("Analyzing candidate experience")
             prompt = f"""
             Analyze the candidate's experience based on their resume and the job requirements.
-            Required minimum years of experience: {min_years}
+            Required minimum years: {min_years}
 
             Job Description:
             {job_description}
@@ -151,27 +136,21 @@ class AIEvaluator:
             Resume:
             {resume_text}
 
-            Focus on:
-            1. Total years of experience in any role
-            2. Years of relevant experience for this specific role
-            3. Whether the candidate meets the minimum experience requirement of {min_years} years
-            4. Quality of experience relative to job requirements
-
             Provide a detailed analysis in JSON format:
             {{
-                "total_years": "Total years of experience (numeric only, e.g., 5.5)",
-                "relevant_years": "Years of relevant experience (numeric only, e.g., 3.0)",
-                "experience_details": "Detailed analysis of experience quality and relevance",
-                "quality_score": "Experience quality score between 0 and 1"
+                "total_years": "Numeric value only (e.g., 5.5)",
+                "relevant_years": "Numeric value only (e.g., 3.0)",
+                "experience_details": "detailed analysis of experience",
+                "quality_score": "score between 0 and 1"
             }}
+
+            Important: For total_years and relevant_years, provide ONLY the numeric value, no text description.
+            Example: "total_years": "5.5" (not "5.5 years" or "5 years and 6 months")
             """
 
             response = self.openai_client.chat.completions.create(
                 model=self.openai_model,
-                messages=[
-                    {"role": "system", "content": "You are an expert in analyzing professional experience."},
-                    {"role": "user", "content": prompt}
-                ],
+                messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
 
@@ -180,30 +159,25 @@ class AIEvaluator:
             # Convert experience values to float and ensure they're numeric
             total_years = self._extract_years_from_text(str(result.get('total_years', '0')))
             relevant_years = self._extract_years_from_text(str(result.get('relevant_years', '0')))
-            required_years = float(min_years) if min_years is not None else 0.0
 
             # Ensure quality score is a float between 0 and 1
             quality_score = float(result.get('quality_score', 0))
             quality_score = max(0.0, min(1.0, quality_score))
 
-            experience_analysis = {
+            return {
                 "total": total_years,
                 "relevant": relevant_years,
-                "required": required_years,
-                "meets_requirement": relevant_years >= required_years,
+                "required": float(min_years),
+                "meets_requirement": relevant_years >= float(min_years),
                 "details": result.get('experience_details', 'No details provided'),
                 "quality_score": quality_score
             }
-
-            logger.info(f"Experience analysis completed: {json.dumps(experience_analysis, indent=2)}")
-            return experience_analysis
-
         except Exception as e:
             logger.error(f"Failed to analyze experience: {e}")
             return {
                 "total": 0.0,
                 "relevant": 0.0,
-                "required": float(min_years if min_years is not None else 0),
+                "required": float(min_years),
                 "meets_requirement": False,
                 "details": "Failed to analyze experience",
                 "quality_score": 0.0
@@ -220,41 +194,15 @@ class AIEvaluator:
             # Extract candidate information
             candidate_info = self._extract_candidate_info(resume_text)
 
-            # Get experience requirements and ensure it's an integer
+            # Get experience requirements
             min_years = evaluation_criteria.get('min_years_experience', 0) if evaluation_criteria else 0
-            if isinstance(min_years, str):
-                try:
-                    min_years = int(min_years)
-                except ValueError:
-                    min_years = 0
-            elif not isinstance(min_years, (int, float)):
-                min_years = 0
-
-            logger.info(f"Required minimum years of experience: {min_years}")
 
             # Analyze experience
             experience_analysis = self._analyze_experience(resume_text, job_description, min_years)
 
-            # Log the experience analysis
-            logger.info(f"Experience analysis results: {json.dumps(experience_analysis, indent=2)}")
-
-            # Update the experience requirements in the evaluation prompt
+            # Evaluate against job requirements
             evaluation_prompt = f"""
             Evaluate the candidate's resume against the job requirements.
-            The position requires a minimum of {min_years} years of experience.
-
-            Job Description:
-            {job_description}
-
-            Resume:
-            {resume_text}
-
-            Experience Analysis:
-            - Total Years: {experience_analysis['total']}
-            - Relevant Years: {experience_analysis['relevant']}
-            - Required Years: {experience_analysis['required']}
-            - Meets Requirement: {experience_analysis['meets_requirement']}
-
             Provide a detailed evaluation in JSON format:
             {{
                 "decision": "SHORTLIST or REJECT",
@@ -267,11 +215,22 @@ class AIEvaluator:
                 }},
                 "missing_requirements": ["list of missing requirements"],
                 "evaluation_metrics": {{
+                    "technical_skills": "score between 0 and 1",
                     "experience_relevance": "score between 0 and 1",
                     "education_match": "score between 0 and 1",
                     "overall_fit": "score between 0 and 1"
+                }},
+                "recommendations": {{
+                    "interview_focus": ["areas to focus on in interview"],
+                    "skill_gaps": ["identified skill gaps"]
                 }}
             }}
+
+            Job Description:
+            {job_description}
+
+            Resume:
+            {resume_text}
             """
 
             if evaluation_criteria:
@@ -284,7 +243,6 @@ class AIEvaluator:
                 Additional Instructions: {evaluation_criteria.get('additional_instructions', '')}
                 """
 
-            # Get the evaluation result
             response = self.openai_client.chat.completions.create(
                 model=self.openai_model,
                 messages=[{"role": "user", "content": evaluation_prompt}],

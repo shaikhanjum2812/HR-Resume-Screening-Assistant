@@ -147,39 +147,29 @@ class Database:
         return self.execute_query('DELETE FROM evaluations', fetch=False)
 
     def add_job_description(self, title, description, evaluation_criteria=None):
-        """Add a new job description with evaluation criteria"""
         query = 'INSERT INTO job_descriptions (title, description) VALUES (%s, %s) RETURNING id'
         job_id = self.execute_query(query, (title, description))[0][0]
 
         if evaluation_criteria:
-            # Ensure min_years_experience is properly handled
-            min_years = evaluation_criteria.get('min_years_experience')
-            if isinstance(min_years, str):
-                try:
-                    min_years = int(min_years)
-                except ValueError:
-                    min_years = 0
-            elif not isinstance(min_years, int):
-                min_years = 0
-
             query = '''
                 INSERT INTO evaluation_criteria (
                     job_id, min_years_experience, required_skills,
                     preferred_skills, education_requirements,
-                    domain_experience_requirements, additional_instructions
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    company_background_requirements, domain_experience_requirements,
+                    additional_instructions
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             '''
             params = (
                 job_id,
-                min_years,
+                evaluation_criteria.get('min_years_experience', 0),
                 json.dumps(evaluation_criteria.get('required_skills', [])),
                 json.dumps(evaluation_criteria.get('preferred_skills', [])),
                 evaluation_criteria.get('education_requirements', ''),
+                evaluation_criteria.get('company_background_requirements', ''),
                 evaluation_criteria.get('domain_experience_requirements', ''),
                 evaluation_criteria.get('additional_instructions', '')
             )
             self.execute_query(query, params, fetch=False)
-            logger.info(f"Added job {job_id} with {min_years} years required experience")
 
         return job_id
 
@@ -218,12 +208,23 @@ class Database:
                 result, justification, match_score, confidence_score,
                 years_experience_total, years_experience_relevant, years_experience_required,
                 meets_experience_requirement, key_matches, missing_requirements,
-                experience_analysis, evaluation_data,
+                experience_analysis, technical_skills_score, experience_relevance_score,
+                education_match_score, overall_fit_score, interview_focus, skill_gaps,
+                technical_depth, problem_solving_score, project_complexity_score,
+                implementation_experience_score, project_expertise_score,
+                experience_quality_score,
+                evaluation_data,
                 resume_file_data, resume_file_type
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             )
         '''
+
+        candidate_info = evaluation_result.get('candidate_info', {})
+        evaluation_metrics = evaluation_result.get('evaluation_metrics', {})
+        recommendations = evaluation_result.get('recommendations', {})
+        technical_assessment = evaluation_result.get('technical_assessment', {})
 
         # Prepare resume file data if provided
         resume_file_data = None
@@ -231,12 +232,6 @@ class Database:
         if resume_file:
             resume_file_data = resume_file.getvalue()
             resume_file_type = resume_file.type
-
-        # Ensure all dictionary data is converted to JSON strings
-        candidate_info = evaluation_result.get('candidate_info', {})
-        key_matches = json.dumps(evaluation_result.get('key_matches', []))
-        missing_requirements = json.dumps(evaluation_result.get('missing_requirements', []))
-        evaluation_data = json.dumps(evaluation_result)
 
         params = (
             job_id,
@@ -246,28 +241,35 @@ class Database:
             candidate_info.get('phone', ''),
             candidate_info.get('location', ''),
             candidate_info.get('linkedin', ''),
-            evaluation_result.get('decision', ''),
-            evaluation_result.get('justification', ''),
-            float(evaluation_result.get('match_score', 0.0)),
-            float(evaluation_result.get('confidence_score', 0.0)),
-            float(evaluation_result.get('years_of_experience', {}).get('total', 0.0)),
-            float(evaluation_result.get('years_of_experience', {}).get('relevant', 0.0)),
-            float(evaluation_result.get('years_of_experience', {}).get('required', 0.0)),
-            bool(evaluation_result.get('years_of_experience', {}).get('meets_requirement', False)),
-            key_matches,
-            missing_requirements,
-            evaluation_result.get('years_of_experience', {}).get('details', ''),
-            evaluation_data,
+            evaluation_result['decision'],
+            evaluation_result['justification'],
+            evaluation_result['match_score'],
+            evaluation_result.get('confidence_score', 0.0),
+            evaluation_result['years_of_experience']['total'],
+            evaluation_result['years_of_experience']['relevant'],
+            evaluation_result['years_of_experience']['required'],
+            evaluation_result['years_of_experience']['meets_requirement'],
+            json.dumps(evaluation_result['key_matches']),
+            json.dumps(evaluation_result['missing_requirements']),
+            evaluation_result['years_of_experience'].get('details', ''),
+            evaluation_metrics.get('technical_skills', 0.0),
+            evaluation_metrics.get('experience_relevance', 0.0),
+            evaluation_metrics.get('education_match', 0.0),
+            evaluation_metrics.get('overall_fit', 0.0),
+            json.dumps(recommendations.get('interview_focus', [])),
+            json.dumps(recommendations.get('skill_gaps', [])),
+            technical_assessment.get('technical_depth', 0.0),
+            technical_assessment.get('problem_solving', 0.0),
+            technical_assessment.get('project_complexity', 0.0),
+            evaluation_metrics.get('implementation_experience', 0.0),
+            evaluation_metrics.get('project_expertise', 0.0),
+            evaluation_result['years_of_experience'].get('quality_score', 0.0),
+            json.dumps(evaluation_result),
             resume_file_data,
             resume_file_type
         )
 
-        try:
-            self.execute_query(query, params, fetch=False)
-            logger.info(f"Successfully saved evaluation for resume: {resume_name}")
-        except Exception as e:
-            logger.error(f"Error saving evaluation: {str(e)}")
-            raise
+        self.execute_query(query, params, fetch=False)
 
     def get_resume_file(self, evaluation_id):
         """Retrieve resume file data for a specific evaluation"""
@@ -329,60 +331,19 @@ class Database:
         return self.execute_query(query)[0][0] or 0
 
     def get_evaluation_criteria(self, job_id):
-        """Get evaluation criteria for a job with proper type conversion"""
         query = 'SELECT * FROM evaluation_criteria WHERE job_id = %s'
         criteria = self.execute_query(query, (job_id,))
         if criteria:
-            try:
-                return {
-                    'min_years_experience': int(criteria[0][2]) if criteria[0][2] is not None else 0,
-                    'required_skills': json.loads(criteria[0][3]) if criteria[0][3] else [],
-                    'preferred_skills': json.loads(criteria[0][4]) if criteria[0][4] else [],
-                    'education_requirements': criteria[0][5] or '',
-                    'company_background_requirements': criteria[0][6] or '',
-                    'domain_experience_requirements': criteria[0][7] or '',
-                    'additional_instructions': criteria[0][8] or ''
-                }
-            except (TypeError, ValueError, json.JSONDecodeError) as e:
-                logger.error(f"Error parsing evaluation criteria: {e}")
-                return None
+            return {
+                'min_years_experience': criteria[0][2],
+                'required_skills': json.loads(criteria[0][3]),
+                'preferred_skills': json.loads(criteria[0][4]),
+                'education_requirements': criteria[0][5],
+                'company_background_requirements': criteria[0][6],
+                'domain_experience_requirements': criteria[0][7],
+                'additional_instructions': criteria[0][8]
+            }
         return None
-
-    def add_evaluation_criteria(self, job_id, criteria):
-        """Add evaluation criteria with proper type handling"""
-        query = '''
-            INSERT INTO evaluation_criteria (
-                job_id, min_years_experience, required_skills,
-                preferred_skills, education_requirements,
-                company_background_requirements, domain_experience_requirements,
-                additional_instructions
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (job_id) DO UPDATE SET
-                min_years_experience = EXCLUDED.min_years_experience,
-                required_skills = EXCLUDED.required_skills,
-                preferred_skills = EXCLUDED.preferred_skills,
-                education_requirements = EXCLUDED.education_requirements,
-                company_background_requirements = EXCLUDED.company_background_requirements,
-                domain_experience_requirements = EXCLUDED.domain_experience_requirements,
-                additional_instructions = EXCLUDED.additional_instructions
-        '''
-        try:
-            min_years = int(criteria.get('min_years_experience', 0))
-            params = (
-                job_id,
-                min_years,
-                json.dumps(criteria.get('required_skills', [])),
-                json.dumps(criteria.get('preferred_skills', [])),
-                criteria.get('education_requirements', ''),
-                criteria.get('company_background_requirements', ''),
-                criteria.get('domain_experience_requirements', ''),
-                criteria.get('additional_instructions', '')
-            )
-            self.execute_query(query, params, fetch=False)
-            logger.info(f"Successfully added/updated evaluation criteria for job {job_id}")
-        except Exception as e:
-            logger.error(f"Error adding evaluation criteria: {e}")
-            raise
 
     def get_evaluation_details(self, evaluation_id):
         """Retrieve detailed evaluation data by ID"""

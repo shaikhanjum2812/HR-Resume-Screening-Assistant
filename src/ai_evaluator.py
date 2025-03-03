@@ -143,7 +143,7 @@ class AIEvaluator:
             logger.info("Analyzing candidate experience")
             prompt = f"""
             Analyze the candidate's experience based on their resume and the job requirements.
-            Required minimum years: {min_years}
+            Required minimum years of experience: {min_years}
 
             Job Description:
             {job_description}
@@ -151,21 +151,27 @@ class AIEvaluator:
             Resume:
             {resume_text}
 
+            Focus on:
+            1. Total years of experience in any role
+            2. Years of relevant experience for this specific role
+            3. Whether the candidate meets the minimum experience requirement of {min_years} years
+            4. Quality of experience relative to job requirements
+
             Provide a detailed analysis in JSON format:
             {{
-                "total_years": "Numeric value only (e.g., 5.5)",
-                "relevant_years": "Numeric value only (e.g., 3.0)",
-                "experience_details": "detailed analysis of experience",
-                "quality_score": "score between 0 and 1"
+                "total_years": "Total years of experience (numeric only, e.g., 5.5)",
+                "relevant_years": "Years of relevant experience (numeric only, e.g., 3.0)",
+                "experience_details": "Detailed analysis of experience quality and relevance",
+                "quality_score": "Experience quality score between 0 and 1"
             }}
-
-            Important: For total_years and relevant_years, provide ONLY the numeric value, no text description.
-            Example: "total_years": "5.5" (not "5.5 years" or "5 years and 6 months")
             """
 
             response = self.openai_client.chat.completions.create(
                 model=self.openai_model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {"role": "system", "content": "You are an expert in analyzing professional experience."},
+                    {"role": "user", "content": prompt}
+                ],
                 response_format={"type": "json_object"}
             )
 
@@ -174,25 +180,30 @@ class AIEvaluator:
             # Convert experience values to float and ensure they're numeric
             total_years = self._extract_years_from_text(str(result.get('total_years', '0')))
             relevant_years = self._extract_years_from_text(str(result.get('relevant_years', '0')))
+            required_years = float(min_years) if min_years is not None else 0.0
 
             # Ensure quality score is a float between 0 and 1
             quality_score = float(result.get('quality_score', 0))
             quality_score = max(0.0, min(1.0, quality_score))
 
-            return {
+            experience_analysis = {
                 "total": total_years,
                 "relevant": relevant_years,
-                "required": float(min_years),
-                "meets_requirement": relevant_years >= float(min_years),
+                "required": required_years,
+                "meets_requirement": relevant_years >= required_years,
                 "details": result.get('experience_details', 'No details provided'),
                 "quality_score": quality_score
             }
+
+            logger.info(f"Experience analysis completed: {json.dumps(experience_analysis, indent=2)}")
+            return experience_analysis
+
         except Exception as e:
             logger.error(f"Failed to analyze experience: {e}")
             return {
                 "total": 0.0,
                 "relevant": 0.0,
-                "required": float(min_years),
+                "required": float(min_years if min_years is not None else 0),
                 "meets_requirement": False,
                 "details": "Failed to analyze experience",
                 "quality_score": 0.0
@@ -210,7 +221,8 @@ class AIEvaluator:
             candidate_info = self._extract_candidate_info(resume_text)
 
             # Get experience requirements
-            min_years = evaluation_criteria.get('min_years_experience', 0) if evaluation_criteria else 0
+            min_years = int(evaluation_criteria.get('min_years_experience', 0)) if evaluation_criteria else 0
+            logger.info(f"Minimum years required: {min_years}")
 
             # Analyze experience
             experience_analysis = self._analyze_experience(resume_text, job_description, min_years)
@@ -218,6 +230,8 @@ class AIEvaluator:
             # Evaluate against job requirements
             evaluation_prompt = f"""
             Evaluate the candidate's resume against the job requirements.
+            The position requires a minimum of {min_years} years of experience.
+
             Provide a detailed evaluation in JSON format:
             {{
                 "decision": "SHORTLIST or REJECT",

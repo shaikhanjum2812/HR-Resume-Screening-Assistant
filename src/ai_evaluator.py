@@ -29,33 +29,39 @@ class AIEvaluator:
         try:
             logger.info("Extracting candidate information using Claude")
             prompt = f"""
-            You are a professional resume parser. Your task is to carefully extract the following information from the resume text.
-            You must find:
-            1. Full Name (usually at the top)
-            2. Email Address (in standard format like example@domain.com)
-            3. Phone Number (any format, standardize if possible)
-            4. Location (city/state/country)
-            5. LinkedIn URL (if available)
+            You are a professional resume parser. Analyze this resume very carefully and extract key information.
+            Focus on accuracy and completeness. Use exact matches from the text, don't paraphrase.
 
-            Rules:
-            - If a field is not directly visible, try to infer it from context (e.g., name from email)
-            - NEVER return null, None, or empty values
-            - If information is truly not found, use "Not provided"
-            - Be thorough in your search and consider all parts of the resume
-            - Format phone numbers consistently when found
-            - Return exact matches when found, don't paraphrase
+            Required Information to Extract:
+            1. Full Name: Must be the candidate's complete name as written
+            2. Email: Must be a valid email format (e.g., name@domain.com)
+            3. Phone: Extract complete number, maintain original format
+            4. Location: Current location including city/state/country
+            5. LinkedIn: Complete LinkedIn profile URL if present
+            6. Education: Highest degree and field of study
+            7. Total Years of Experience: Calculate from work history
+            8. Key Skills: List of primary technical and professional skills
 
             Resume text to analyze:
             {resume_text}
 
-            Provide the information in this exact JSON format:
+            Return the information in this exact JSON format:
             {{
-                "name": "Full Name",
-                "email": "email@address.com",
-                "phone": "Phone Number",
-                "location": "City, State/Country",
-                "linkedin": "LinkedIn Profile URL"
+                "name": "extracted full name",
+                "email": "extracted email",
+                "phone": "extracted phone",
+                "location": "extracted location",
+                "linkedin": "extracted linkedin url",
+                "education": "extracted education details",
+                "total_experience": "calculated years",
+                "key_skills": ["skill1", "skill2", "skill3"]
             }}
+
+            Rules:
+            - Extract EXACT text from resume, don't modify or standardize
+            - If information isn't found, use "Not provided"
+            - For experience, calculate total years from work history
+            - Include ALL skills mentioned in technical skills or core competencies sections
             """
 
             # First try with Anthropic
@@ -71,25 +77,31 @@ class AIEvaluator:
                     ]
                 )
                 result = json.loads(response.content)
+                logger.info("Successfully parsed resume with Anthropic")
             except Exception as e:
                 logger.warning(f"Anthropic extraction failed, falling back to OpenAI: {e}")
                 # Fallback to OpenAI
                 response = self.openai_client.chat.completions.create(
                     model=self.openai_model,
                     messages=[
-                        {"role": "system", "content": "You are a resume parser expert. Be thorough in extracting contact information."},
+                        {"role": "system", "content": "You are a resume parsing expert focused on accurate information extraction."},
                         {"role": "user", "content": prompt}
                     ],
                     response_format={"type": "json_object"}
                 )
                 result = json.loads(response.choices[0].message.content)
-
-            logger.info("Successfully extracted candidate information")
+                logger.info("Successfully parsed resume with OpenAI fallback")
 
             # Validate and clean results
-            for key in ['name', 'email', 'phone', 'location', 'linkedin']:
+            for key in ['name', 'email', 'phone', 'location', 'linkedin', 'education', 'total_experience']:
                 if key not in result or not result[key] or result[key].lower() in ['none', 'null', '']:
                     result[key] = "Not provided"
+
+            if 'key_skills' not in result or not isinstance(result['key_skills'], list):
+                result['key_skills'] = []
+
+            # Log the extracted information for debugging
+            logger.info(f"Extracted candidate information: {json.dumps(result, indent=2)}")
 
             return result
         except Exception as e:
@@ -99,7 +111,10 @@ class AIEvaluator:
                 "email": "Not provided",
                 "phone": "Not provided",
                 "location": "Not provided",
-                "linkedin": "Not provided"
+                "linkedin": "Not provided",
+                "education": "Not provided",
+                "total_experience": "Not provided",
+                "key_skills": []
             }
 
     def _extract_years_from_text(self, text: str) -> float:

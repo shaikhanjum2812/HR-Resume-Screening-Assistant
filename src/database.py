@@ -319,19 +319,60 @@ class Database:
         return self.execute_query(query)[0][0] or 0
 
     def get_evaluation_criteria(self, job_id):
+        """Get evaluation criteria for a job with proper type conversion"""
         query = 'SELECT * FROM evaluation_criteria WHERE job_id = %s'
         criteria = self.execute_query(query, (job_id,))
         if criteria:
-            return {
-                'min_years_experience': criteria[0][2],
-                'required_skills': json.loads(criteria[0][3]),
-                'preferred_skills': json.loads(criteria[0][4]),
-                'education_requirements': criteria[0][5],
-                'company_background_requirements': criteria[0][6],
-                'domain_experience_requirements': criteria[0][7],
-                'additional_instructions': criteria[0][8]
-            }
+            try:
+                return {
+                    'min_years_experience': int(criteria[0][2]) if criteria[0][2] is not None else 0,
+                    'required_skills': json.loads(criteria[0][3]) if criteria[0][3] else [],
+                    'preferred_skills': json.loads(criteria[0][4]) if criteria[0][4] else [],
+                    'education_requirements': criteria[0][5] or '',
+                    'company_background_requirements': criteria[0][6] or '',
+                    'domain_experience_requirements': criteria[0][7] or '',
+                    'additional_instructions': criteria[0][8] or ''
+                }
+            except (TypeError, ValueError, json.JSONDecodeError) as e:
+                logger.error(f"Error parsing evaluation criteria: {e}")
+                return None
         return None
+
+    def add_evaluation_criteria(self, job_id, criteria):
+        """Add evaluation criteria with proper type handling"""
+        query = '''
+            INSERT INTO evaluation_criteria (
+                job_id, min_years_experience, required_skills,
+                preferred_skills, education_requirements,
+                company_background_requirements, domain_experience_requirements,
+                additional_instructions
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (job_id) DO UPDATE SET
+                min_years_experience = EXCLUDED.min_years_experience,
+                required_skills = EXCLUDED.required_skills,
+                preferred_skills = EXCLUDED.preferred_skills,
+                education_requirements = EXCLUDED.education_requirements,
+                company_background_requirements = EXCLUDED.company_background_requirements,
+                domain_experience_requirements = EXCLUDED.domain_experience_requirements,
+                additional_instructions = EXCLUDED.additional_instructions
+        '''
+        try:
+            min_years = int(criteria.get('min_years_experience', 0))
+            params = (
+                job_id,
+                min_years,
+                json.dumps(criteria.get('required_skills', [])),
+                json.dumps(criteria.get('preferred_skills', [])),
+                criteria.get('education_requirements', ''),
+                criteria.get('company_background_requirements', ''),
+                criteria.get('domain_experience_requirements', ''),
+                criteria.get('additional_instructions', '')
+            )
+            self.execute_query(query, params, fetch=False)
+            logger.info(f"Successfully added/updated evaluation criteria for job {job_id}")
+        except Exception as e:
+            logger.error(f"Error adding evaluation criteria: {e}")
+            raise
 
     def get_evaluation_details(self, evaluation_id):
         """Retrieve detailed evaluation data by ID"""

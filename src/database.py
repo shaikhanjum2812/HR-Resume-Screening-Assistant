@@ -585,23 +585,24 @@ class Database:
         result = self.execute_query(query, (session_id,), cursor_factory=psycopg2.extras.DictCursor)
         transcript = []
         
-        for row in result:
-            transcript.append({
-                'question_id': row['question_id'],
-                'question_type': row['question_type'],
-                'question': row['question_text'],
-                'order': row['display_order'],
-                'response_id': row['response_id'],
-                'response': row['response_text'],
-                'score': row['score'],
-                'strengths': row['strengths'],
-                'weaknesses': row['weaknesses'],
-                'evaluation_notes': row['evaluation_notes'],
-                'follow_up': row['follow_up'],
-                'response_time': row['response_time'],
-                'response_time_formatted': f"{row['response_time'] // 60}m {row['response_time'] % 60}s" if row['response_time'] else "",
-                'timestamp': row['created_at']
-            })
+        if result:
+            for row in result:
+                transcript.append({
+                    'question_id': row['question_id'],
+                    'question_type': row['question_type'],
+                    'question': row['question_text'],
+                    'order': row['display_order'],
+                    'response_id': row['response_id'],
+                    'response': row['response_text'],
+                    'score': row['score'],
+                    'strengths': row['strengths'],
+                    'weaknesses': row['weaknesses'],
+                    'evaluation_notes': row['evaluation_notes'],
+                    'follow_up': row['follow_up'],
+                    'response_time': row['response_time'],
+                    'response_time_formatted': f"{row['response_time'] // 60}m {row['response_time'] % 60}s" if row['response_time'] else "",
+                    'timestamp': row['created_at']
+                })
             
         return transcript
         
@@ -619,7 +620,9 @@ class Database:
         '''
         
         result = self.execute_query(query, cursor_factory=psycopg2.extras.DictCursor)
-        return [dict(row) for row in result]
+        if result:
+            return [dict(row) for row in result]
+        return []
         
     def get_completed_interviews(self):
         """Get all completed interview sessions"""
@@ -638,4 +641,6 @@ class Database:
         '''
         
         result = self.execute_query(query, cursor_factory=psycopg2.extras.DictCursor)
-        return [dict(row) for row in result]
+        if result:
+            return [dict(row) for row in result]
+        return []

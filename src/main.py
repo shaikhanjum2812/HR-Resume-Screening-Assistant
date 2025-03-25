@@ -1232,7 +1232,7 @@ def show_interviews():
                         transcript = st.session_state.components['db'].get_interview_transcript(selected_id)
                         session = st.session_state.components['db'].get_interview_session(selected_id)
                         
-                        if session and transcript:
+                        if session and transcript is not None:
                             st.subheader(f"Interview Details: {session['candidate_name']}")
                             st.caption(f"SAP {session['sap_module']} - {session['job_title']}")
                             

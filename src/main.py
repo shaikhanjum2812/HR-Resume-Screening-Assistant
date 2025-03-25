@@ -1086,6 +1086,7 @@ def show_interviews():
                                 'technical_score': final_report.get('technical_proficiency', {}).get('score', 0),
                                 'communication_score': final_report.get('communication_skills', {}).get('score', 0),
                                 'problem_solving_score': final_report.get('problem_solving_ability', {}).get('score', 0),
+                                'experience_score': final_report.get('experience_assessment', {}).get('score', 0),
                                 'recommendation': final_report.get('hiring_recommendation', ''),
                                 'recommendation_reasoning': final_report.get('recommendation_reasoning', ''),
                                 'interview_data': final_report
@@ -1118,7 +1119,9 @@ def show_interviews():
                             
                             # Detailed scores
                             st.write("#### Detailed Assessment")
-                            col1, col2, col3 = st.columns(3)
+                            
+                            # First row of metrics
+                            col1, col2, col3, col4 = st.columns(4)
                             with col1:
                                 technical_score = final_report.get('technical_proficiency', {}).get('score', 0)
                                 st.metric("Technical Proficiency", f"{technical_score}/10")
@@ -1128,6 +1131,23 @@ def show_interviews():
                             with col3:
                                 problem_solving_score = final_report.get('problem_solving_ability', {}).get('score', 0)
                                 st.metric("Problem Solving", f"{problem_solving_score}/10")
+                            with col4:
+                                experience_score = final_report.get('experience_assessment', {}).get('score', 0)
+                                st.metric("Experience", f"{experience_score}/10")
+                                
+                            # SAP Module Expertise Section
+                            st.write("#### SAP Module Expertise Assessment")
+                            st.write(f"**Module Expertise:** {final_report.get('technical_proficiency', {}).get('sap_module_expertise', 'Not assessed')}")
+                            
+                            # SAP Technical Assessment
+                            with st.expander("Technical Assessment Details"):
+                                st.write(f"**Technical Assessment:** {final_report.get('technical_proficiency', {}).get('assessment', '')}")
+                                st.write(f"**Technical Gaps:** {final_report.get('technical_proficiency', {}).get('technical_gaps', '')}")
+                                
+                            # Experience Assessment 
+                            with st.expander("Experience Assessment Details"):
+                                st.write(f"**Experience Assessment:** {final_report.get('experience_assessment', {}).get('assessment', '')}")
+                                st.write(f"**Implementation Experience:** {final_report.get('experience_assessment', {}).get('implementation_experience', '')}")
                             
                             # Strengths and weaknesses
                             col1, col2 = st.columns(2)

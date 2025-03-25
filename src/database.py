@@ -519,16 +519,16 @@ class Database:
         """Get details of an interview session"""
         query = '''
             SELECT 
-                is.id, is.evaluation_id, is.sap_module, is.status,
-                is.start_time, is.end_time, is.overall_score, 
-                is.technical_score, is.communication_score, is.problem_solving_score, is.experience_score,
-                is.recommendation, is.recommendation_reasoning, is.interview_data,
+                sess.id, sess.evaluation_id, sess.sap_module, sess.status,
+                sess.start_time, sess.end_time, sess.overall_score, 
+                sess.technical_score, sess.communication_score, sess.problem_solving_score, sess.experience_score,
+                sess.recommendation, sess.recommendation_reasoning, sess.interview_data,
                 ev.candidate_name, ev.resume_name, ev.job_id,
                 jd.title as job_title, jd.description as job_description
-            FROM interview_sessions is
-            JOIN evaluations ev ON is.evaluation_id = ev.id
+            FROM interview_sessions sess
+            JOIN evaluations ev ON sess.evaluation_id = ev.id
             JOIN job_descriptions jd ON ev.job_id = jd.id
-            WHERE is.id = %s
+            WHERE sess.id = %s
         '''
         
         result = self.execute_query(query, (session_id,), cursor_factory=psycopg2.extras.DictCursor)
@@ -597,13 +597,13 @@ class Database:
         """Get all pending interview sessions"""
         query = '''
             SELECT 
-                is.id, is.evaluation_id, is.sap_module, is.status,
-                is.created_at, ev.candidate_name, jd.title as job_title
-            FROM interview_sessions is
-            JOIN evaluations ev ON is.evaluation_id = ev.id
+                sess.id, sess.evaluation_id, sess.sap_module, sess.status,
+                sess.created_at, ev.candidate_name, jd.title as job_title
+            FROM interview_sessions sess
+            JOIN evaluations ev ON sess.evaluation_id = ev.id
             JOIN job_descriptions jd ON ev.job_id = jd.id
-            WHERE is.status = 'pending'
-            ORDER BY is.created_at DESC
+            WHERE sess.status = 'pending'
+            ORDER BY sess.created_at DESC
         '''
         
         result = self.execute_query(query, cursor_factory=psycopg2.extras.DictCursor)
@@ -613,14 +613,14 @@ class Database:
         """Get all completed interview sessions"""
         query = '''
             SELECT 
-                is.id, is.evaluation_id, is.sap_module, is.status,
-                is.start_time, is.end_time, is.overall_score, is.recommendation,
+                sess.id, sess.evaluation_id, sess.sap_module, sess.status,
+                sess.start_time, sess.end_time, sess.overall_score, sess.recommendation,
                 ev.candidate_name, jd.title as job_title
-            FROM interview_sessions is
-            JOIN evaluations ev ON is.evaluation_id = ev.id
+            FROM interview_sessions sess
+            JOIN evaluations ev ON sess.evaluation_id = ev.id
             JOIN job_descriptions jd ON ev.job_id = jd.id
-            WHERE is.status = 'completed'
-            ORDER BY is.end_time DESC
+            WHERE sess.status = 'completed'
+            ORDER BY sess.end_time DESC
         '''
         
         result = self.execute_query(query, cursor_factory=psycopg2.extras.DictCursor)

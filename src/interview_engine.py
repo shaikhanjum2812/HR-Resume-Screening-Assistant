@@ -54,16 +54,38 @@ class InterviewEngine:
             behavioral_count = int(num_questions * 0.2)  # 20% behavioral
             problem_count = num_questions - tech_count - scenario_count - behavioral_count  # Remainder for problem-solving
             
-            prompt = f"""
-            You are an expert SAP {sap_module} interviewer with deep domain knowledge. Generate highly specialized interview questions for a candidate with the following resume, applying for a position with the following job description.
+            # SAP module-specific hint for question generation 
+            module_specific_hints = {
+                "FI": "Include questions about GL accounting, accounts payable, accounts receivable, asset accounting, financial statements, and integration with CO. Reference transactions like FB01, F-02, F-03, FBL1N, and tables like BKPF, BSEG.",
+                "CO": "Include questions about cost center accounting, profit center accounting, product costing, profitability analysis, and CO-PA. Reference transactions like KE21N, KS01, CK11N, and tables like COEP, COSS.",
+                "MM": "Include questions about procurement processes, inventory management, material master, vendor master, and purchasing. Reference transactions like ME21N, MIGO, MM01, XK01, and tables like EKKO, EKPO, MARA.",
+                "SD": "Include questions about sales order processing, delivery, billing, pricing, customer master, and output determination. Reference transactions like VA01, VL01N, VF01, and tables like VBAK, VBAP, KNA1.",
+                "PP": "Include questions about production planning, MRP, capacity planning, work centers, routing, and BOM management. Reference transactions like CS01, CS02, MD01, CO01, and tables like MAST, STKO, CRHD.",
+                "HCM": "Include questions about personnel administration, time management, payroll, organizational management, and ESS/MSS. Reference infotypes, time evaluation schemas, and payroll clusters.",
+                "PM": "Include questions about maintenance planning, work order management, equipment and functional location master data. Reference transactions like IW31, IW32, IE01, IL01, and tables like ILOA, EQUI.",
+                "QM": "Include questions about quality planning, inspection processing, quality certificates, and defect recording. Reference transactions like QA01, QA02, QE51N, and quality-related tables.",
+                "WM": "Include questions about warehouse structure, put-away strategies, picking strategies, and integration with MM and SD. Reference transactions like LT01, LT03, LS01, and tables like LQUA, LAGP.",
+                "BW": "Include questions about data modeling, BW objects (InfoObjects, DSOs, MultiProviders), extraction, transformation, and reporting. Reference BW modeling and administration concepts.",
+                "ABAP": "Include questions about programming concepts, ABAP Dictionary, performance optimization, ALV reporting, debugger, and enhancement techniques. Reference SE11, SE16, SE38, SE80 transactions."
+            }
             
-            The questions must be deeply technical and specifically tailored to evaluate SAP {sap_module} expertise. Focus on identifying both breadth and depth of knowledge.
+            # Get module-specific hints or use generic if module not in list
+            module_hint = module_specific_hints.get(sap_module.upper(), 
+                          f"Include questions specific to {sap_module} functionality, key transactions, tables, and integration points.")
+            
+            prompt = f"""
+            You are an elite SAP {sap_module} interviewer with 15+ years of implementation experience and deep domain knowledge. Generate highly specialized interview questions for a candidate with the following resume, applying for a position with the following job description.
+            
+            The questions must be deeply technical and specifically tailored to evaluate SAP {sap_module} expertise. Focus on identifying both breadth and depth of knowledge. Assume the candidate claims expertise - your job is to verify real expertise vs. superficial knowledge.
             
             JOB DESCRIPTION:
             {job_description}
             
             CANDIDATE'S RESUME:
             {resume_text}
+            
+            SAP {sap_module} MODULE GUIDANCE:
+            {module_hint}
             
             Please generate unique interview questions in the following JSON format:
             
@@ -87,17 +109,35 @@ class InterviewEngine:
             }}
             
             The questions MUST adhere to these requirements:
-            1. Highly specific to the SAP {sap_module} module (mention specific transactions, tables, configuration settings)
-            2. Based on the candidate's exact skills and experience from their resume
-            3. Directly relevant to the job requirements
-            4. Different for each candidate (not generic)
+            1. Extremely specific to the SAP {sap_module} module (always mention specific transactions, tables, configuration settings, BAPIs, etc.)
+            2. Precisely tailored to the candidate's exact skills and experience from their resume
+            3. Directly relevant to the job requirements mentioned in the description
+            4. Uniquely crafted for this candidate (not generic)
             5. Detailed enough to assess true expertise (should challenge even experienced professionals)
-            6. Include SAP-specific terminology and concepts relevant to the {sap_module} module
+            6. Include advanced SAP-specific terminology and concepts relevant to the {sap_module} module
+            7. Include at least 2 questions about SAP S/4HANA-specific changes to the {sap_module} module (if applicable)
+            8. Include at least 1 question about SAP Fiori apps relevant to the {sap_module} module
             
-            For technical questions, ask about specific configuration settings, tables, BAPIs, reports, or transactions relevant to {sap_module}.
-            For scenario questions, present real-world implementation challenges specific to {sap_module}.
-            For behavioral questions, focus on SAP project experiences, team dynamics, and stakeholder management.
-            For problem-solving, present complex technical issues that would arise in an SAP {sap_module} implementation.
+            For technical questions:
+            - Ask about specific configuration settings, tables, BAPIs, reports, or transactions relevant to {sap_module}
+            - Include questions about data structures, integration points, and authorization objects
+            - Ask about specific customizing steps for complex {sap_module} processes
+            
+            For scenario questions:
+            - Present complex real-world implementation challenges specific to {sap_module}
+            - Include international/global scenarios with multiple legal entities if relevant
+            - Reference actual business requirements that would require advanced configuration
+            
+            For behavioral questions:
+            - Focus on SAP project experiences, specifically around {sap_module} implementations
+            - Ask about challenging stakeholder situations related to {sap_module} requirements
+            - Explore how they handled technical disagreements on configuration approaches
+            
+            For problem-solving:
+            - Present complex technical issues that would arise in an SAP {sap_module} implementation
+            - Include performance optimization scenarios
+            - Include data migration or conversion challenges specific to {sap_module}
+            - Include integration troubleshooting with other SAP modules
             """
             
             response = self.openai_client.chat.completions.create(
@@ -143,9 +183,45 @@ class InterviewEngine:
                 question_index = min(question_number, len(questions[question_type])-1)
                 current_question = questions[question_type][question_index]['question']
             
-            prompt = f"""
-            You are an expert SAP {question_type} interviewer with deep technical knowledge. Critically evaluate the candidate's response to the following question:
+            # Create module and question type specific evaluation criteria
+            sap_module = interview_context.get('sap_module', 'Unknown')
             
+            # Define evaluation criteria weight based on question type
+            weights = {
+                "technical": {
+                    "technical_accuracy": 40,
+                    "sap_specific_knowledge": 30,
+                    "experience_application": 20,
+                    "clarity": 10
+                },
+                "scenario": {
+                    "solution_approach": 30,
+                    "sap_specific_knowledge": 30,
+                    "business_understanding": 20,
+                    "experience_application": 20
+                },
+                "behavioral": {
+                    "relevant_experience": 40,
+                    "teamwork_approach": 20,
+                    "sap_context_understanding": 20,
+                    "communication_clarity": 20
+                },
+                "problem_solving": {
+                    "solution_approach": 30,
+                    "technical_understanding": 30,
+                    "experience_application": 20,
+                    "systematic_thinking": 20
+                }
+            }
+            
+            # Get appropriate weights for this question type
+            current_weights = weights.get(question_type, weights["technical"])
+            weight_text = "\n".join([f"{k.replace('_', ' ').title()} ({v}%)" for k, v in current_weights.items()])
+            
+            prompt = f"""
+            You are an experienced SAP {sap_module} technical interviewer with deep implementation expertise. Critically evaluate the candidate's response to the following {question_type} question with a focus on verifying genuine expertise.
+            
+            SAP MODULE: {sap_module}
             QUESTION TYPE: {question_type}
             
             QUESTION:
@@ -154,23 +230,32 @@ class InterviewEngine:
             CANDIDATE'S RESPONSE:
             {candidate_response}
             
-            Evaluate the response focusing on:
-            1. Technical accuracy and depth (60%)
-            2. Demonstration of SAP-specific knowledge (20%) 
-            3. Clarity and structure of response (10%)
-            4. Application of experience to the answer (10%)
+            Evaluate the response focusing on these weighted criteria:
+            {weight_text}
             
             Provide an evaluation in the following JSON format:
             
             {{
-                "score": /* Score between 0-10 based on above criteria */,
-                "strengths": /* List of specific strengths in the response, particularly noting correct SAP technical details */,
-                "weaknesses": /* List of specific weaknesses or areas for improvement, noting any technical inaccuracies */,
-                "follow_up": /* Optional follow-up question if needed for clarification or to probe deeper */,
-                "evaluation_notes": /* Detailed technical evaluation notes for the interviewer */
+                "score": /* Score between 0-10 based on the weighted criteria above */,
+                "technical_assessment": /* Brief technical assessment of their SAP {sap_module} knowledge demonstrated */,
+                "experience_evaluation": /* Brief assessment of their practical experience demonstrated in the answer */,
+                "strengths": /* List of 2-3 specific strengths in the response, with focus on SAP {sap_module} technical accuracy */,
+                "weaknesses": /* List of 2-3 specific weaknesses or areas for improvement, noting any technical inaccuracies */,
+                "follow_up": /* Optional follow-up question to probe deeper where knowledge appears shallow */,
+                "evaluation_notes": /* Detailed technical evaluation notes for the interviewer with specific SAP {sap_module} references */
             }}
             
-            Be critical but fair in your evaluation. For technical questions especially, verify if the candidate demonstrates actual SAP module expertise or just generic knowledge. Look for specific SAP terminology, transaction codes, tables, and processes in their answer. If they provide vague or generic answers to specific technical questions, this should be reflected in the score.
+            EVALUATION GUIDELINES:
+            1. Be technically precise and critical while remaining fair
+            2. Look specifically for SAP {sap_module} terminology, transaction codes, tables, and processes
+            3. Verify if they demonstrate actual hands-on experience or just theoretical knowledge
+            4. Check for depth of understanding rather than superficial answers
+            5. Note if they mention relevant S/4HANA changes or Fiori apps when applicable
+            6. Score of 7+ should only be given to answers that show clear expertise
+            7. Distinguish between memorized facts vs. understanding of concepts
+            8. Evaluate if their approach matches SAP best practices
+            9. Note any inconsistencies between their claimed experience and demonstrated knowledge
+            10. Be particularly attentive to accuracy regarding customizing, integration points, and authorization concepts
             """
             
             response = self.openai_client.chat.completions.create(
@@ -216,8 +301,26 @@ class InterviewEngine:
                 transcript_text += f"A{i+1}: {qa.get('answer', '')}\n"
                 transcript_text += f"Evaluation: Score {qa.get('evaluation', {}).get('score', 'N/A')}/10\n\n"
             
+            # Define module-specific evaluation criteria
+            module_evaluation_guide = {
+                "FI": "Focus on evaluating their knowledge of financial accounting, G/L, A/P, A/R, asset accounting, banking, and financial reporting. Assess their ability to handle complex financial scenarios, period-end closing activities, and financial process integration.",
+                "CO": "Focus on evaluating their knowledge of cost center accounting, product costing, profit center accounting, internal orders, and profitability analysis. Assess their ability to handle management reporting, allocation methods, and integration with FI.",
+                "MM": "Focus on evaluating their knowledge of purchasing, inventory management, master data, MRP, goods movements, and vendor management. Assess their understanding of procurement processes, source determination, and pricing conditions.",
+                "SD": "Focus on evaluating their knowledge of sales order processing, delivery, billing, pricing, customer master data, and output determination. Assess their understanding of complex pricing scenarios and integration with logistics.",
+                "PP": "Focus on evaluating their knowledge of production planning, MRP, capacity planning, shop floor control, and BOM/routing management. Assess their ability to handle complex manufacturing scenarios.",
+                "HCM": "Focus on evaluating their knowledge of personnel administration, time management, payroll, organizational management, and benefits administration. Assess their understanding of complex payroll rules and legal requirements.",
+                "PM": "Focus on evaluating their knowledge of maintenance planning, work order management, equipment and functional location master data, and integration with MM. Assess their understanding of maintenance strategies.",
+                "QM": "Focus on evaluating their knowledge of quality planning, inspection processing, quality certificates, and integration with MM and PP. Assess their understanding of quality control processes.",
+                "WM": "Focus on evaluating their knowledge of warehouse structure, storage bin determination, putaway strategies, picking strategies, and integration with MM and SD. Assess their understanding of warehouse optimization.",
+                "ABAP": "Focus on evaluating their programming knowledge, ABAP Dictionary expertise, debugging skills, performance optimization knowledge, and experience with advanced ABAP concepts. Assess their understanding of BADI, User Exits, and enhancement frameworks."
+            }
+            
+            eval_guide = module_evaluation_guide.get(sap_module.upper(), 
+                         f"Focus on evaluating their knowledge of {sap_module} functionality, configuration, integration points, and business process understanding.")
+            
+            # Create a detailed prompt for final evaluation
             prompt = f"""
-            You are an expert SAP {sap_module} interviewer and technical hiring manager. Generate a comprehensive final evaluation report for a candidate after their SAP module-specific interview.
+            You are an SAP {sap_module} Principal Consultant and technical hiring manager with 15+ years of implementation experience. Generate a comprehensive final evaluation report for a candidate after their SAP module-specific interview.
             
             JOB DESCRIPTION:
             {job_description}
@@ -228,7 +331,10 @@ class InterviewEngine:
             INTERVIEW TRANSCRIPT:
             {transcript_text}
             
-            Evaluate the candidate across multiple dimensions with a significant focus on their SAP {sap_module} technical expertise.
+            SAP {sap_module} EVALUATION GUIDANCE:
+            {eval_guide}
+            
+            Evaluate the candidate across multiple dimensions with a significant focus on their SAP {sap_module} technical expertise and implementation experience.
             
             Provide a final evaluation report in the following JSON format:
             
@@ -237,36 +343,50 @@ class InterviewEngine:
                 "technical_proficiency": {{
                     "score": /* Technical score between 0-10 */,
                     "assessment": /* Detailed assessment of technical skills in SAP {sap_module} */,
-                    "sap_module_expertise": /* Specific evaluation of their {sap_module} knowledge */,
-                    "technical_gaps": /* Specific technical knowledge gaps identified */
+                    "sap_module_expertise": /* Specific evaluation of their {sap_module} knowledge including transactions, tables, and configuration expertise */,
+                    "technical_gaps": /* Specific technical knowledge gaps identified in their {sap_module} expertise */
                 }},
                 "communication_skills": {{
                     "score": /* Communication score between 0-10 */,
-                    "assessment": /* Assessment of their ability to explain complex SAP concepts */
+                    "assessment": /* Assessment of their ability to explain complex SAP {sap_module} concepts clearly */,
+                    "stakeholder_communication": /* Evaluation of how they would communicate with business stakeholders */
                 }},
                 "problem_solving_ability": {{
                     "score": /* Problem-solving score between 0-10 */,
-                    "assessment": /* Assessment of their approach to SAP implementation challenges */
+                    "assessment": /* Assessment of their approach to {sap_module} implementation challenges */,
+                    "methodology": /* Evaluation of their problem-solving methodology and structure */
                 }},
                 "experience_assessment": {{
                     "score": /* Experience score between 0-10 */,
-                    "assessment": /* Evaluation of the quality and relevance of their SAP experience */,
-                    "implementation_experience": /* Analysis of their SAP implementation experience */
+                    "assessment": /* Detailed evaluation of the quality, depth and relevance of their SAP {sap_module} experience */,
+                    "implementation_experience": /* Analysis of their SAP implementation experience including project phases, roles, and responsibilities */,
+                    "s4hana_experience": /* Assessment of their SAP S/4HANA knowledge and experience if demonstrated */
                 }},
-                "strengths": /* List of key strengths, particularly noting SAP technical strengths */,
-                "areas_for_improvement": /* List of specific areas for improvement */,
-                "cultural_fit": /* Assessment of cultural fit and team collaboration potential */,
-                "hiring_recommendation": /* "Hire", "Reject", or "Consider for another position" */,
-                "recommendation_reasoning": /* Detailed explanation for the hiring recommendation */
+                "strengths": [
+                    /* List of 3-5 specific strengths, particularly noting SAP {sap_module} technical strengths with concrete examples from their responses */
+                ],
+                "areas_for_improvement": [
+                    /* List of 3-5 specific areas for improvement with recommendations */
+                ],
+                "additional_observations": /* Any other important observations about the candidate */,
+                "cultural_fit": /* Assessment of cultural fit and team collaboration potential based on behavioral responses */,
+                "hiring_recommendation": /* "Hire", "Consider", or "Do Not Hire" */,
+                "recommendation_reasoning": /* Detailed explanation for the hiring recommendation with specific reference to job requirements */
             }}
             
             In your assessment:
-            1. Be specific about their {sap_module} expertise level (beginner, intermediate, advanced, expert)
-            2. Evaluate their knowledge of specific {sap_module} transactions, tables, and configuration settings
+            1. Be highly specific about their {sap_module} expertise level (beginner, intermediate, advanced, expert)
+            2. Evaluate their knowledge of specific {sap_module} transactions, tables, and configuration settings mentioned in their responses
             3. Assess their understanding of SAP integration points with other modules
-            4. Consider both theoretical knowledge and practical application expertise
-            5. Evaluate their experience with SAP implementation, support, and enhancement projects
-            6. Consider whether they meet the specific requirements in the job description
+            4. Distinguish between theoretical knowledge and practical implementation experience
+            5. Evaluate their experience with full-cycle SAP implementation projects
+            6. Consider whether they meet the specific SAP {sap_module} requirements in the job description
+            7. Assess their S/4HANA and Fiori knowledge if relevant to the position
+            8. Evaluate their ability to bridge technical concepts with business requirements
+            9. Consider their ability to handle complex {sap_module} scenarios typical in enterprise implementations
+            10. Assess whether they understand SAP best practices and why they exist
+            
+            Be fair but critical in your final assessment, focusing on their demonstrated SAP {sap_module} expertise rather than general IT skills.
             """
             
             response = self.openai_client.chat.completions.create(

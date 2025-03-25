@@ -97,7 +97,7 @@ class Database:
                     CREATE TABLE IF NOT EXISTS interview_sessions (
                         id SERIAL PRIMARY KEY,
                         evaluation_id INTEGER REFERENCES evaluations(id),
-                        sap_module VARCHAR(10) NOT NULL,
+                        sap_module VARCHAR(50) NOT NULL,
                         status VARCHAR(20) NOT NULL DEFAULT 'pending',
                         start_time TIMESTAMP,
                         end_time TIMESTAMP,
@@ -105,6 +105,7 @@ class Database:
                         technical_score FLOAT,
                         communication_score FLOAT,
                         problem_solving_score FLOAT,
+                        experience_score FLOAT,
                         recommendation VARCHAR(50),
                         recommendation_reasoning TEXT,
                         interview_data JSONB,
@@ -491,6 +492,7 @@ class Database:
                 technical_score = %s,
                 communication_score = %s,
                 problem_solving_score = %s,
+                experience_score = %s,
                 recommendation = %s,
                 recommendation_reasoning = %s,
                 interview_data = %s
@@ -504,6 +506,7 @@ class Database:
             session_data.get('technical_score', 0),
             session_data.get('communication_score', 0),
             session_data.get('problem_solving_score', 0),
+            session_data.get('experience_score', 0),
             session_data.get('recommendation', ''),
             session_data.get('recommendation_reasoning', ''),
             json.dumps(session_data.get('interview_data', {})),
@@ -518,7 +521,7 @@ class Database:
             SELECT 
                 is.id, is.evaluation_id, is.sap_module, is.status,
                 is.start_time, is.end_time, is.overall_score, 
-                is.technical_score, is.communication_score, is.problem_solving_score,
+                is.technical_score, is.communication_score, is.problem_solving_score, is.experience_score,
                 is.recommendation, is.recommendation_reasoning, is.interview_data,
                 ev.candidate_name, ev.resume_name, ev.job_id,
                 jd.title as job_title, jd.description as job_description
@@ -542,6 +545,7 @@ class Database:
                 'technical_score': row['technical_score'],
                 'communication_score': row['communication_score'],
                 'problem_solving_score': row['problem_solving_score'],
+                'experience_score': row['experience_score'],
                 'recommendation': row['recommendation'],
                 'recommendation_reasoning': row['recommendation_reasoning'],
                 'interview_data': json.loads(row['interview_data']) if row['interview_data'] else {},

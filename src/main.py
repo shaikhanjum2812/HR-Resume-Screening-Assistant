@@ -1237,13 +1237,16 @@ def show_interviews():
                             st.caption(f"SAP {session['sap_module']} - {session['job_title']}")
                             
                             # Display interview summary
-                            col1, col2 = st.columns(2)
+                            col1, col2, col3 = st.columns(3)
                             with col1:
                                 st.metric("Overall Score", f"{session['overall_score']}/10")
                                 st.metric("Technical Score", f"{session['technical_score']}/10")
                             with col2:
                                 st.metric("Communication Score", f"{session['communication_score']}/10")
                                 st.metric("Problem Solving", f"{session['problem_solving_score']}/10")
+                            with col3:
+                                st.metric("Experience Score", f"{session.get('experience_score', 0)}/10")
+                                st.write("**SAP Module:** " + session['sap_module'])
                             
                             st.write(f"**Recommendation:** {session['recommendation']}")
                             st.write(f"**Reasoning:** {session['recommendation_reasoning']}")

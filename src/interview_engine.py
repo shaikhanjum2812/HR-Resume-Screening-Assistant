@@ -264,7 +264,7 @@ class InterviewEngine:
                 response_format={"type": "json_object"}
             )
             
-            result = json.loads(response.choices[0].message.content)
+            result = json.dumps(response.choices[0].message.content)
             logger.info("Successfully evaluated candidate response")
             
             return result
@@ -395,7 +395,7 @@ class InterviewEngine:
                 response_format={"type": "json_object"}
             )
             
-            result = json.loads(response.choices[0].message.content)
+            result = json.dumps(response.choices[0].message.content)
             logger.info("Successfully generated final interview report")
             
             return result

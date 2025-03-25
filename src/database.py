@@ -24,6 +24,24 @@ class Database:
         except Exception as e:
             logger.error(f"Database initialization error: {e}")
             raise
+            
+    def _parse_json_safely(self, json_data):
+        """Safely parse JSON data regardless of input type"""
+        if json_data is None:
+            return {}
+            
+        if isinstance(json_data, dict):
+            return json_data
+            
+        try:
+            if isinstance(json_data, str):
+                return json.loads(json_data)
+            else:
+                # Handle PostgreSQL JSONB type
+                return json_data
+        except Exception as e:
+            logger.error(f"JSON parsing error: {str(e)}")
+            return {}
 
     @contextmanager
     def get_connection(self):
@@ -560,7 +578,7 @@ class Database:
                 'experience_score': row['experience_score'],
                 'recommendation': row['recommendation'],
                 'recommendation_reasoning': row['recommendation_reasoning'],
-                'interview_data': json.loads(row['interview_data']) if row['interview_data'] else {},
+                'interview_data': self._parse_json_safely(row['interview_data']),
                 'candidate_name': row['candidate_name'],
                 'resume_name': row['resume_name'],
                 'job_id': row['job_id'],

@@ -148,7 +148,7 @@ class Database:
 
     def add_job_description(self, title, description, evaluation_criteria=None):
         query = 'INSERT INTO job_descriptions (title, description) VALUES (%s, %s) RETURNING id'
-        job_id = self.execute_query(query, (title, description))[0][0]
+        job_id = self.execute_query(query, (title, description))[0][0] if self.execute_query(query, (title, description)) else None
 
         if evaluation_criteria:
             query = '''
@@ -285,19 +285,20 @@ class Database:
         return self.execute_query(query,(start_date, end_date))
 
     def get_active_jobs_count(self):
-        return self.execute_query('SELECT COUNT(*) FROM job_descriptions WHERE active = true')[0][0]
+        return self.execute_query('SELECT COUNT(*) FROM job_descriptions WHERE active = true')[0][0] if self.execute_query('SELECT COUNT(*) FROM job_descriptions WHERE active = true') else 0
+
 
     def get_today_evaluations_count(self):
         query = '''
                 SELECT COUNT(*) FROM evaluations 
                 WHERE DATE(evaluation_date) = CURRENT_DATE
             '''
-        return self.execute_query(query)[0][0]
+        return self.execute_query(query)[0][0] if self.execute_query(query) else None
 
     def get_total_evaluations_count(self):
         """Get the total number of evaluations"""
         query = 'SELECT COUNT(*) FROM evaluations'
-        return self.execute_query(query)[0][0] or 0
+        return (self.execute_query(query)[0][0] if self.execute_query(query) else 0)
 
     def get_shortlisted_count(self):
         """Get the total number of shortlisted resumes"""

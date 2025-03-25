@@ -916,7 +916,7 @@ def show_interviews():
                         )
                         
                         st.success("Interview questions generated successfully!")
-                        st.experimental_rerun()
+                        st.rerun()
                         
                     except Exception as e:
                         st.error(f"Error generating interview questions: {str(e)}")
@@ -1046,7 +1046,7 @@ def show_interviews():
                                             if 'response_start_time' in st.session_state:
                                                 del st.session_state.response_start_time
                                                 
-                                            st.experimental_rerun()
+                                            st.rerun()
                                     
                                     except Exception as e:
                                         st.error(f"Error processing response: {str(e)}")
@@ -1056,7 +1056,7 @@ def show_interviews():
                         if st.button("End Interview"):
                             if st.session_state.interview_responses:
                                 st.session_state.interview_complete = True
-                                st.experimental_rerun()
+                                st.rerun()
                             else:
                                 st.error("Please submit at least one response before ending the interview.")
                 
@@ -1175,7 +1175,7 @@ def show_interviews():
                                 if 'response_start_time' in st.session_state:
                                     del st.session_state.response_start_time
                                     
-                                st.experimental_rerun()
+                                st.rerun()
                         
                         except Exception as e:
                             st.error(f"Error generating final report: {str(e)}")

@@ -614,7 +614,9 @@ class Database:
         query = '''
             SELECT 
                 sess.id, sess.evaluation_id, sess.sap_module, sess.status,
-                sess.start_time, sess.end_time, sess.overall_score, sess.recommendation,
+                sess.start_time, sess.end_time, sess.overall_score, 
+                sess.technical_score, sess.communication_score, sess.problem_solving_score, sess.experience_score, 
+                sess.recommendation,
                 ev.candidate_name, jd.title as job_title
             FROM interview_sessions sess
             JOIN evaluations ev ON sess.evaluation_id = ev.id

@@ -173,6 +173,9 @@ class Database:
                     cursor.execute(query, params or ())
                     if fetch:
                         result = cursor.fetchall()
+                        # Return empty list if no results instead of None
+                        if result is None or len(result) == 0:
+                            return []
                     else:
                         result = None
                     conn.commit()
@@ -214,7 +217,8 @@ class Database:
 
     def add_job_description(self, title, description, evaluation_criteria=None):
         query = 'INSERT INTO job_descriptions (title, description) VALUES (%s, %s) RETURNING id'
-        job_id = self.execute_query(query, (title, description))[0][0] if self.execute_query(query, (title, description)) else None
+        result = self.execute_query(query, (title, description))
+        job_id = result[0][0] if result and len(result) > 0 else None
 
         if evaluation_criteria:
             query = '''
@@ -351,39 +355,44 @@ class Database:
         return self.execute_query(query,(start_date, end_date))
 
     def get_active_jobs_count(self):
-        return self.execute_query('SELECT COUNT(*) FROM job_descriptions WHERE active = true')[0][0] if self.execute_query('SELECT COUNT(*) FROM job_descriptions WHERE active = true') else 0
-
+        query = 'SELECT COUNT(*) FROM job_descriptions WHERE active = true'
+        result = self.execute_query(query)
+        return result[0][0] if result and len(result) > 0 else 0
 
     def get_today_evaluations_count(self):
         query = '''
                 SELECT COUNT(*) FROM evaluations 
                 WHERE DATE(evaluation_date) = CURRENT_DATE
             '''
-        return self.execute_query(query)[0][0] if self.execute_query(query) else None
+        result = self.execute_query(query)
+        return result[0][0] if result and len(result) > 0 else 0
 
     def get_total_evaluations_count(self):
         """Get the total number of evaluations"""
         query = 'SELECT COUNT(*) FROM evaluations'
-        return (self.execute_query(query)[0][0] if self.execute_query(query) else 0)
+        result = self.execute_query(query)
+        return result[0][0] if result and len(result) > 0 else 0
 
     def get_shortlisted_count(self):
         """Get the total number of shortlisted resumes"""
         query = "SELECT COUNT(*) FROM evaluations WHERE LOWER(result) = 'shortlist'"
-        return self.execute_query(query)[0][0] or 0
+        result = self.execute_query(query)
+        return result[0][0] if result and len(result) > 0 else 0
 
     def get_rejected_count(self):
         """Get the total number of rejected resumes"""
         query = "SELECT COUNT(*) FROM evaluations WHERE LOWER(result) = 'reject'"
-        return self.execute_query(query)[0][0] or 0
+        result = self.execute_query(query)
+        return result[0][0] if result and len(result) > 0 else 0
 
     def get_evaluation_criteria(self, job_id):
         query = 'SELECT * FROM evaluation_criteria WHERE job_id = %s'
         criteria = self.execute_query(query, (job_id,))
-        if criteria:
+        if criteria and len(criteria) > 0:
             return {
                 'min_years_experience': criteria[0][2],
-                'required_skills': json.loads(criteria[0][3]),
-                'preferred_skills': json.loads(criteria[0][4]),
+                'required_skills': self._parse_json_safely(criteria[0][3]),
+                'preferred_skills': self._parse_json_safely(criteria[0][4]),
                 'education_requirements': criteria[0][5],
                 'company_background_requirements': criteria[0][6],
                 'domain_experience_requirements': criteria[0][7],
@@ -410,11 +419,11 @@ class Database:
                 'years_experience_relevant': row['years_experience_relevant'],
                 'years_experience_required': row['years_experience_required'],
                 'meets_experience_requirement': row['meets_experience_requirement'],
-                'key_matches': json.loads(row['key_matches']),
-                'missing_requirements': json.loads(row['missing_requirements']),
+                'key_matches': self._parse_json_safely(row['key_matches']),
+                'missing_requirements': self._parse_json_safely(row['missing_requirements']),
                 'experience_analysis': row['experience_analysis'],
                 'evaluation_date': row['evaluation_date'],
-                'evaluation_data': json.loads(row['evaluation_data'])
+                'evaluation_data': self._parse_json_safely(row['evaluation_data'])
             }
         return None
         
@@ -428,7 +437,7 @@ class Database:
             RETURNING id
         '''
         result = self.execute_query(query, (evaluation_id, sap_module))
-        if result:
+        if result and len(result) > 0:
             return result[0][0]
         return None
         
@@ -465,13 +474,14 @@ class Database:
             'problem_solving': []
         }
         
-        for row in result:
-            questions[row['question_type']].append({
-                'id': row['id'],
-                'question': row['question_text'],
-                'context': row['question_context'],
-                'order': row['display_order']
-            })
+        if result and len(result) > 0:
+            for row in result:
+                questions[row['question_type']].append({
+                    'id': row['id'],
+                    'question': row['question_text'],
+                    'context': row['question_context'],
+                    'order': row['display_order']
+                })
             
         return questions
         
@@ -484,19 +494,28 @@ class Database:
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         '''
+        # Convert strengths and weaknesses to JSON if they are lists or dicts
+        strengths = response_data.get('strengths', '')
+        if isinstance(strengths, (list, dict)):
+            strengths = json.dumps(strengths)
+        
+        weaknesses = response_data.get('weaknesses', '')
+        if isinstance(weaknesses, (list, dict)):
+            weaknesses = json.dumps(weaknesses)
+            
         params = (
             question_id,
             response_data.get('response_text', ''),
             response_data.get('score', 0),
-            response_data.get('strengths', ''),
-            response_data.get('weaknesses', ''),
+            strengths,
+            weaknesses,
             response_data.get('evaluation_notes', ''),
             response_data.get('follow_up', ''),
             response_data.get('response_time', 0)
         )
         
         result = self.execute_query(query, params)
-        if result:
+        if result and len(result) > 0:
             return result[0][0]
         return None
         
@@ -603,7 +622,7 @@ class Database:
         result = self.execute_query(query, (session_id,), cursor_factory=psycopg2.extras.DictCursor)
         transcript = []
         
-        if result:
+        if result and len(result) > 0:
             for row in result:
                 transcript.append({
                     'question_id': row['question_id'],
@@ -613,8 +632,8 @@ class Database:
                     'response_id': row['response_id'],
                     'response': row['response_text'],
                     'score': row['score'],
-                    'strengths': row['strengths'],
-                    'weaknesses': row['weaknesses'],
+                    'strengths': self._parse_json_safely(row['strengths']),
+                    'weaknesses': self._parse_json_safely(row['weaknesses']),
                     'evaluation_notes': row['evaluation_notes'],
                     'follow_up': row['follow_up'],
                     'response_time': row['response_time'],
@@ -638,7 +657,7 @@ class Database:
         '''
         
         result = self.execute_query(query, cursor_factory=psycopg2.extras.DictCursor)
-        if result:
+        if result and len(result) > 0:
             return [dict(row) for row in result]
         return []
         
@@ -659,6 +678,6 @@ class Database:
         '''
         
         result = self.execute_query(query, cursor_factory=psycopg2.extras.DictCursor)
-        if result:
+        if result and len(result) > 0:
             return [dict(row) for row in result]
         return []

@@ -499,6 +499,18 @@ class Database:
             WHERE id = %s
         '''
         
+        # Handle interview_data
+        interview_data = session_data.get('interview_data', {})
+        if isinstance(interview_data, dict):
+            # Convert dictionary to JSON string
+            interview_data_json = json.dumps(interview_data)
+        elif isinstance(interview_data, str):
+            # Already a JSON string
+            interview_data_json = interview_data
+        else:
+            # Default to empty object
+            interview_data_json = '{}'
+            
         params = (
             session_data.get('status', 'completed'),
             datetime.now(),
@@ -509,7 +521,7 @@ class Database:
             session_data.get('experience_score', 0),
             session_data.get('recommendation', ''),
             session_data.get('recommendation_reasoning', ''),
-            json.dumps(session_data.get('interview_data', {})),
+            interview_data_json,
             session_id
         )
         

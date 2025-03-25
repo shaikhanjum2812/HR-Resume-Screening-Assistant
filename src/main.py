@@ -5,13 +5,17 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import json
+import time
+import psycopg2
+from psycopg2.extras import DictCursor
 from database import Database
 from ai_evaluator import AIEvaluator
 from pdf_processor import PDFProcessor
 from docx_processor import DOCXProcessor
 from analytics import Analytics
+from interview_engine import InterviewEngine
 from utils import extract_text_from_upload
-from report_generator import generate_evaluation_report, generate_summary_report # Added import for summary report generation
+from report_generator import generate_evaluation_report, generate_summary_report
 
 # Configure logging
 logging.basicConfig(
@@ -33,16 +37,21 @@ def initialize_components():
 
         logger.info("Initializing PDF Processor, DOCX Processor and Analytics...")
         pdf_processor = PDFProcessor()
-        docx_processor = DOCXProcessor()  # Add DOCX processor
+        docx_processor = DOCXProcessor()
         analytics = Analytics()
         logger.info("PDF Processor, DOCX Processor and Analytics initialization successful")
+        
+        logger.info("Initializing Interview Engine...")
+        interview_engine = InterviewEngine()
+        logger.info("Interview Engine initialization successful")
 
         return {
             'db': db,
             'ai_evaluator': ai_evaluator,
             'pdf_processor': pdf_processor,
             'docx_processor': docx_processor,
-            'analytics': analytics
+            'analytics': analytics,
+            'interview_engine': interview_engine
         }
     except Exception as e:
         logger.error(f"Failed to initialize components: {str(e)}")
@@ -780,6 +789,468 @@ def init_session_state():
         st.session_state.page = 'home'
     if 'components' not in st.session_state:
         st.session_state.components = None
+    if 'interview_session' not in st.session_state:
+        st.session_state.interview_session = None
+    if 'current_question' not in st.session_state:
+        st.session_state.current_question = 0
+    if 'current_question_type' not in st.session_state:
+        st.session_state.current_question_type = 'technical'
+    if 'interview_questions' not in st.session_state:
+        st.session_state.interview_questions = None
+    if 'interview_responses' not in st.session_state:
+        st.session_state.interview_responses = []
+    if 'interview_complete' not in st.session_state:
+        st.session_state.interview_complete = False
+
+def show_interviews():
+    st.title("SAP Interview Engine")
+    
+    tab1, tab2 = st.tabs(["Start Interview", "Interview History"])
+    
+    with tab1:
+        if st.session_state.interview_session is None:
+            # Show interface to select shortlisted candidates for interview
+            st.subheader("Select a Shortlisted Candidate")
+            
+            # Query database for shortlisted candidates
+            try:
+                # Get recent shortlisted candidates
+                query = '''
+                    SELECT e.id, e.resume_name, e.candidate_name, 
+                           j.title as job_title, e.evaluation_date
+                    FROM evaluations e
+                    JOIN job_descriptions j ON e.job_id = j.id
+                    WHERE LOWER(e.result) = 'shortlist'
+                    ORDER BY e.evaluation_date DESC
+                    LIMIT 20
+                '''
+                shortlisted = st.session_state.components['db'].execute_query(query, cursor_factory=DictCursor)
+                
+                if not shortlisted or len(shortlisted) == 0:
+                    st.warning("No shortlisted candidates found. Please evaluate and shortlist candidates first.")
+                    return
+            except Exception as e:
+                st.error(f"Error loading shortlisted candidates: {str(e)}")
+                logger.error(f"Error loading shortlisted candidates: {str(e)}")
+                return
+            
+            # Display candidates in a dropdown
+            options = []
+            for candidate in shortlisted:
+                label = f"{candidate['candidate_name']} - {candidate['job_title']} ({candidate['resume_name']})"
+                options.append({"label": label, "value": candidate['id']})
+            
+            # Create UI elements
+            evaluation_id = st.selectbox(
+                "Select Candidate",
+                options=[opt["value"] for opt in options],
+                format_func=lambda x: next((opt["label"] for opt in options if opt["value"] == x), "")
+            )
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                sap_module = st.selectbox(
+                    "SAP Module",
+                    ["FI", "CO", "MM", "SD", "PP", "HCM", "ABAP", "BASIS"]
+                )
+            
+            with col2:
+                num_questions = st.slider(
+                    "Number of Questions",
+                    min_value=5,
+                    max_value=20,
+                    value=10,
+                    step=1
+                )
+            
+            if st.button("Generate Interview Questions"):
+                with st.spinner("Generating personalized SAP interview questions..."):
+                    try:
+                        # Get the evaluation details
+                        evaluation = st.session_state.components['db'].get_evaluation_details(evaluation_id)
+                        
+                        if not evaluation:
+                            st.error("Could not retrieve candidate information.")
+                            return
+                        
+                        # Create an interview session in the database
+                        session_id = st.session_state.components['db'].create_interview_session(
+                            evaluation_id=evaluation_id,
+                            sap_module=sap_module
+                        )
+                        
+                        if not session_id:
+                            st.error("Failed to create interview session.")
+                            return
+                        
+                        # Get the candidate resume and job details
+                        job_description = st.session_state.components['db'].execute_query(
+                            "SELECT description FROM job_descriptions WHERE id = %s",
+                            (evaluation['job_id'],)
+                        )[0][0]
+                        
+                        # Generate personalized questions
+                        questions = st.session_state.components['interview_engine'].generate_questions(
+                            sap_module=sap_module,
+                            job_description=job_description,
+                            resume_text=evaluation['evaluation_data']['candidate_info'].get('resume_text', ''),
+                            num_questions=num_questions
+                        )
+                        
+                        # Save questions to the database
+                        st.session_state.components['db'].save_interview_questions(session_id, questions)
+                        
+                        # Store in session state
+                        st.session_state.interview_session = session_id
+                        st.session_state.interview_questions = questions
+                        st.session_state.current_question = 0
+                        st.session_state.current_question_type = list(questions.keys())[0]
+                        st.session_state.interview_responses = []
+                        st.session_state.interview_complete = False
+                        
+                        # Set interview start time
+                        st.session_state.components['db'].execute_query(
+                            "UPDATE interview_sessions SET start_time = %s WHERE id = %s",
+                            (datetime.now(), session_id),
+                            fetch=False
+                        )
+                        
+                        st.success("Interview questions generated successfully!")
+                        st.experimental_rerun()
+                        
+                    except Exception as e:
+                        st.error(f"Error generating interview questions: {str(e)}")
+                        logger.error(f"Interview generation error: {str(e)}")
+        
+        else:
+            # Show interview interface
+            # Get session info
+            session_info = st.session_state.components['db'].get_interview_session(st.session_state.interview_session)
+            
+            if session_info:
+                st.subheader(f"SAP {session_info['sap_module']} Interview: {session_info['candidate_name']}")
+                st.caption(f"Position: {session_info['job_title']}")
+                
+                # Progress bar
+                questions = st.session_state.interview_questions
+                total_questions = sum(len(q_list) for q_list in questions.values())
+                answered_questions = len(st.session_state.interview_responses)
+                progress = answered_questions / total_questions if total_questions > 0 else 0
+                
+                st.progress(progress)
+                st.write(f"Question {answered_questions + 1} of {total_questions}")
+                
+                # Display current question type
+                current_type = st.session_state.current_question_type
+                type_labels = {
+                    'technical': '💻 Technical Knowledge',
+                    'scenario': '🔄 SAP Scenario',
+                    'behavioral': '👥 Behavioral',
+                    'problem_solving': '🧩 Problem Solving'
+                }
+                st.write(f"**{type_labels.get(current_type, current_type)}**")
+                
+                # Get current question
+                if (current_type in questions and 
+                    st.session_state.current_question < len(questions[current_type])):
+                    question = questions[current_type][st.session_state.current_question]
+                    
+                    # Display question
+                    st.write(f"### Q: {question['question']}")
+                    
+                    # Response input
+                    if 'response_start_time' not in st.session_state:
+                        st.session_state.response_start_time = time.time()
+                        
+                    candidate_response = st.text_area(
+                        "Enter your response",
+                        height=150,
+                        key=f"response_{current_type}_{st.session_state.current_question}"
+                    )
+                    
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        if st.button("Submit Response"):
+                            if not candidate_response.strip():
+                                st.error("Please enter a response before submitting.")
+                            else:
+                                with st.spinner("Evaluating response..."):
+                                    try:
+                                        # Calculate response time
+                                        response_time = int(time.time() - st.session_state.response_start_time)
+                                        
+                                        # Evaluate response
+                                        interview_context = {
+                                            'current_question': st.session_state.current_question,
+                                            'current_question_type': current_type
+                                        }
+                                        
+                                        evaluation = st.session_state.components['interview_engine'].conduct_interview(
+                                            questions=st.session_state.interview_questions,
+                                            candidate_response=candidate_response,
+                                            interview_context=interview_context
+                                        )
+                                        
+                                        # Save response to database
+                                        question_id = None
+                                        # Need to get the question ID from the database
+                                        db_questions = st.session_state.components['db'].get_interview_questions(
+                                            st.session_state.interview_session
+                                        )
+                                        
+                                        if current_type in db_questions and st.session_state.current_question < len(db_questions[current_type]):
+                                            question_id = db_questions[current_type][st.session_state.current_question]['id']
+                                        
+                                        if question_id:
+                                            response_data = {
+                                                'response_text': candidate_response,
+                                                'score': evaluation.get('score', 0),
+                                                'strengths': ', '.join(evaluation.get('strengths', [])),
+                                                'weaknesses': ', '.join(evaluation.get('weaknesses', [])),
+                                                'evaluation_notes': evaluation.get('evaluation_notes', ''),
+                                                'follow_up': evaluation.get('follow_up', ''),
+                                                'response_time': response_time
+                                            }
+                                            
+                                            st.session_state.components['db'].save_interview_response(
+                                                question_id, response_data
+                                            )
+                                            
+                                            # Store in session state
+                                            st.session_state.interview_responses.append({
+                                                'question': question['question'],
+                                                'question_type': current_type,
+                                                'response': candidate_response,
+                                                'evaluation': evaluation,
+                                                'response_time': response_time
+                                            })
+                                            
+                                            # Move to next question
+                                            if st.session_state.current_question + 1 < len(questions[current_type]):
+                                                # More questions in current type
+                                                st.session_state.current_question += 1
+                                            else:
+                                                # Move to next question type
+                                                question_types = list(questions.keys())
+                                                current_index = question_types.index(current_type)
+                                                
+                                                if current_index + 1 < len(question_types):
+                                                    # Move to next type
+                                                    st.session_state.current_question_type = question_types[current_index + 1]
+                                                    st.session_state.current_question = 0
+                                                else:
+                                                    # Interview complete
+                                                    st.session_state.interview_complete = True
+                                            
+                                            # Reset response timer
+                                            if 'response_start_time' in st.session_state:
+                                                del st.session_state.response_start_time
+                                                
+                                            st.experimental_rerun()
+                                    
+                                    except Exception as e:
+                                        st.error(f"Error processing response: {str(e)}")
+                                        logger.error(f"Response evaluation error: {str(e)}")
+                    
+                    with col2:
+                        if st.button("End Interview"):
+                            if st.session_state.interview_responses:
+                                st.session_state.interview_complete = True
+                                st.experimental_rerun()
+                            else:
+                                st.error("Please submit at least one response before ending the interview.")
+                
+                # If interview is complete, show summary and final evaluation
+                if st.session_state.interview_complete:
+                    with st.spinner("Generating final interview report..."):
+                        try:
+                            # Get session info again
+                            session_info = st.session_state.components['db'].get_interview_session(
+                                st.session_state.interview_session
+                            )
+                            
+                            # Generate final report
+                            transcript = st.session_state.interview_responses
+                            
+                            final_report = st.session_state.components['interview_engine'].generate_final_report(
+                                sap_module=session_info['sap_module'],
+                                job_description=session_info['job_description'],
+                                resume_text=session_info['resume_name'],
+                                interview_transcript=transcript
+                            )
+                            
+                            # Save final results to database
+                            session_data = {
+                                'status': 'completed',
+                                'overall_score': final_report.get('overall_score', 0),
+                                'technical_score': final_report.get('technical_proficiency', {}).get('score', 0),
+                                'communication_score': final_report.get('communication_skills', {}).get('score', 0),
+                                'problem_solving_score': final_report.get('problem_solving_ability', {}).get('score', 0),
+                                'recommendation': final_report.get('hiring_recommendation', ''),
+                                'recommendation_reasoning': final_report.get('recommendation_reasoning', ''),
+                                'interview_data': final_report
+                            }
+                            
+                            st.session_state.components['db'].update_interview_session(
+                                st.session_state.interview_session, session_data
+                            )
+                            
+                            # Display results
+                            st.success("Interview completed successfully!")
+                            
+                            st.subheader("Interview Summary")
+                            
+                            # Overall score with progress bar
+                            overall_score = final_report.get('overall_score', 0)
+                            st.write(f"#### Overall Score: {overall_score}/10")
+                            st.progress(overall_score/10)
+                            
+                            # Display final recommendation
+                            recommendation = final_report.get('hiring_recommendation', '')
+                            if recommendation.lower() == 'hire':
+                                st.success(f"Recommendation: {recommendation}")
+                            elif recommendation.lower() == 'reject':
+                                st.error(f"Recommendation: {recommendation}")
+                            else:
+                                st.info(f"Recommendation: {recommendation}")
+                                
+                            st.write(f"**Reasoning:** {final_report.get('recommendation_reasoning', '')}")
+                            
+                            # Detailed scores
+                            st.write("#### Detailed Assessment")
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                technical_score = final_report.get('technical_proficiency', {}).get('score', 0)
+                                st.metric("Technical Proficiency", f"{technical_score}/10")
+                            with col2:
+                                communication_score = final_report.get('communication_skills', {}).get('score', 0)
+                                st.metric("Communication Skills", f"{communication_score}/10")
+                            with col3:
+                                problem_solving_score = final_report.get('problem_solving_ability', {}).get('score', 0)
+                                st.metric("Problem Solving", f"{problem_solving_score}/10")
+                            
+                            # Strengths and weaknesses
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.write("#### Strengths")
+                                strengths = final_report.get('strengths', [])
+                                for strength in strengths:
+                                    st.write(f"- {strength}")
+                            
+                            with col2:
+                                st.write("#### Areas for Improvement")
+                                weaknesses = final_report.get('areas_for_improvement', [])
+                                for weakness in weaknesses:
+                                    st.write(f"- {weakness}")
+                            
+                            # Button to start a new interview
+                            if st.button("Start New Interview"):
+                                # Reset interview state
+                                st.session_state.interview_session = None
+                                st.session_state.interview_questions = None
+                                st.session_state.current_question = 0
+                                st.session_state.current_question_type = 'technical'
+                                st.session_state.interview_responses = []
+                                st.session_state.interview_complete = False
+                                if 'response_start_time' in st.session_state:
+                                    del st.session_state.response_start_time
+                                    
+                                st.experimental_rerun()
+                        
+                        except Exception as e:
+                            st.error(f"Error generating final report: {str(e)}")
+                            logger.error(f"Final report error: {str(e)}")
+                            
+                            # Button to force reset interview
+                            if st.button("Reset Interview"):
+                                st.session_state.interview_session = None
+                                st.session_state.interview_questions = None
+                                st.session_state.current_question = 0
+                                st.session_state.current_question_type = 'technical'
+                                st.session_state.interview_responses = []
+                                st.session_state.interview_complete = False
+                                if 'response_start_time' in st.session_state:
+                                    del st.session_state.response_start_time
+                                st.experimental_rerun()
+    
+    with tab2:
+        st.subheader("Interview History")
+        
+        # Display completed interviews
+        completed = st.session_state.components['db'].get_completed_interviews()
+        
+        if not completed:
+            st.info("No completed interviews yet.")
+        else:
+            # Create a DataFrame for better display
+            interviews_data = []
+            for interview in completed:
+                interviews_data.append({
+                    "ID": interview['id'],
+                    "Candidate": interview['candidate_name'],
+                    "Position": interview['job_title'],
+                    "SAP Module": interview['sap_module'],
+                    "Date": interview['end_time'].strftime('%Y-%m-%d') if interview['end_time'] else "",
+                    "Overall Score": f"{interview['overall_score']}/10" if interview['overall_score'] else "N/A",
+                    "Recommendation": interview['recommendation'] if interview['recommendation'] else "N/A"
+                })
+            
+            if interviews_data:
+                df = pd.DataFrame(interviews_data)
+                st.dataframe(df)
+                
+                # Allow viewing interview details
+                selected_id = st.selectbox(
+                    "Select an interview to view details",
+                    options=[interview['id'] for interview in completed],
+                    format_func=lambda x: f"{next((i['candidate_name'] for i in completed if i['id'] == x), '')} - {next((i['job_title'] for i in completed if i['id'] == x), '')}"
+                )
+                
+                if st.button("View Details"):
+                    if selected_id:
+                        # Get transcript and session info
+                        transcript = st.session_state.components['db'].get_interview_transcript(selected_id)
+                        session = st.session_state.components['db'].get_interview_session(selected_id)
+                        
+                        if session and transcript:
+                            st.subheader(f"Interview Details: {session['candidate_name']}")
+                            st.caption(f"SAP {session['sap_module']} - {session['job_title']}")
+                            
+                            # Display interview summary
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Overall Score", f"{session['overall_score']}/10")
+                                st.metric("Technical Score", f"{session['technical_score']}/10")
+                            with col2:
+                                st.metric("Communication Score", f"{session['communication_score']}/10")
+                                st.metric("Problem Solving", f"{session['problem_solving_score']}/10")
+                            
+                            st.write(f"**Recommendation:** {session['recommendation']}")
+                            st.write(f"**Reasoning:** {session['recommendation_reasoning']}")
+                            
+                            # Display transcript
+                            st.write("#### Interview Transcript")
+                            
+                            for i, item in enumerate(transcript):
+                                with st.expander(f"Q{i+1}: {item['question']} ({item['question_type'].capitalize()})"):
+                                    if item['response']:
+                                        st.write("**Response:**")
+                                        st.write(item['response'])
+                                        
+                                        st.write(f"**Score:** {item['score']}/10")
+                                        
+                                        col1, col2 = st.columns(2)
+                                        with col1:
+                                            st.write("**Strengths:**")
+                                            st.write(item['strengths'])
+                                        with col2:
+                                            st.write("**Areas for Improvement:**")
+                                            st.write(item['weaknesses'])
+                                        
+                                        if item['response_time']:
+                                            st.caption(f"Response time: {item['response_time_formatted']}")
+                                    else:
+                                        st.info("No response recorded for this question.")
 
 
 def sidebar():
@@ -790,6 +1261,7 @@ def sidebar():
         'Home': 'home',
         'Job Descriptions': 'jobs',
         'Resume Evaluation': 'evaluation',
+        'SAP Interviews': 'interviews',
         'Past Evaluations': 'past_evaluations',
         'Analytics': 'analytics'
     }
@@ -828,6 +1300,8 @@ def main():
             show_jobs()
         elif st.session_state.page == 'evaluation':
             show_evaluation()
+        elif st.session_state.page == 'interviews':
+            show_interviews()
         elif st.session_state.page == 'past_evaluations':
             show_past_evaluations()
         elif st.session_state.page == 'analytics':

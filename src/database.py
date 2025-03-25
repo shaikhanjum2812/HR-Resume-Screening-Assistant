@@ -91,6 +91,53 @@ class Database:
                         resume_file_type VARCHAR(255)
                     )
                     ''')
+                    
+                    # Create interview-related tables
+                    cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS interview_sessions (
+                        id SERIAL PRIMARY KEY,
+                        evaluation_id INTEGER REFERENCES evaluations(id),
+                        sap_module VARCHAR(10) NOT NULL,
+                        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                        start_time TIMESTAMP,
+                        end_time TIMESTAMP,
+                        overall_score FLOAT,
+                        technical_score FLOAT,
+                        communication_score FLOAT,
+                        problem_solving_score FLOAT,
+                        recommendation VARCHAR(50),
+                        recommendation_reasoning TEXT,
+                        interview_data JSONB,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    ''')
+                    
+                    cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS interview_questions (
+                        id SERIAL PRIMARY KEY,
+                        session_id INTEGER REFERENCES interview_sessions(id),
+                        question_type VARCHAR(20) NOT NULL,
+                        question_text TEXT NOT NULL,
+                        question_context TEXT,
+                        display_order INTEGER NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    ''')
+                    
+                    cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS interview_responses (
+                        id SERIAL PRIMARY KEY,
+                        question_id INTEGER REFERENCES interview_questions(id),
+                        response_text TEXT,
+                        score FLOAT,
+                        strengths TEXT,
+                        weaknesses TEXT,
+                        evaluation_notes TEXT,
+                        follow_up TEXT,
+                        response_time INTEGER, 
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    ''')
 
                     conn.commit()
                     logger.info("Database tables created successfully")
@@ -351,3 +398,226 @@ class Database:
                 'evaluation_data': json.loads(row['evaluation_data'])
             }
         return None
+        
+    # Interview-related methods
+    def create_interview_session(self, evaluation_id, sap_module):
+        """Create a new interview session for an evaluated candidate"""
+        query = '''
+            INSERT INTO interview_sessions 
+            (evaluation_id, sap_module, status)
+            VALUES (%s, %s, 'pending')
+            RETURNING id
+        '''
+        result = self.execute_query(query, (evaluation_id, sap_module))
+        if result:
+            return result[0][0]
+        return None
+        
+    def save_interview_questions(self, session_id, questions):
+        """Save a set of generated interview questions"""
+        for question_type, questions_list in questions.items():
+            for i, question in enumerate(questions_list):
+                query = '''
+                    INSERT INTO interview_questions
+                    (session_id, question_type, question_text, question_context, display_order)
+                    VALUES (%s, %s, %s, %s, %s)
+                '''
+                self.execute_query(
+                    query, 
+                    (session_id, question_type, question['question'], question.get('context', ''), i),
+                    fetch=False
+                )
+                
+    def get_interview_questions(self, session_id):
+        """Get all questions for an interview session, grouped by type"""
+        query = '''
+            SELECT id, question_type, question_text, question_context, display_order
+            FROM interview_questions
+            WHERE session_id = %s
+            ORDER BY question_type, display_order
+        '''
+        result = self.execute_query(query, (session_id,), cursor_factory=psycopg2.extras.DictCursor)
+        
+        # Group questions by type
+        questions = {
+            'technical': [],
+            'scenario': [],
+            'behavioral': [],
+            'problem_solving': []
+        }
+        
+        for row in result:
+            questions[row['question_type']].append({
+                'id': row['id'],
+                'question': row['question_text'],
+                'context': row['question_context'],
+                'order': row['display_order']
+            })
+            
+        return questions
+        
+    def save_interview_response(self, question_id, response_data):
+        """Save a candidate's response and its evaluation"""
+        query = '''
+            INSERT INTO interview_responses
+            (question_id, response_text, score, strengths, weaknesses, 
+             evaluation_notes, follow_up, response_time)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        '''
+        params = (
+            question_id,
+            response_data.get('response_text', ''),
+            response_data.get('score', 0),
+            response_data.get('strengths', ''),
+            response_data.get('weaknesses', ''),
+            response_data.get('evaluation_notes', ''),
+            response_data.get('follow_up', ''),
+            response_data.get('response_time', 0)
+        )
+        
+        result = self.execute_query(query, params)
+        if result:
+            return result[0][0]
+        return None
+        
+    def update_interview_session(self, session_id, session_data):
+        """Update an interview session with final results"""
+        query = '''
+            UPDATE interview_sessions
+            SET status = %s,
+                end_time = %s,
+                overall_score = %s,
+                technical_score = %s,
+                communication_score = %s,
+                problem_solving_score = %s,
+                recommendation = %s,
+                recommendation_reasoning = %s,
+                interview_data = %s
+            WHERE id = %s
+        '''
+        
+        params = (
+            session_data.get('status', 'completed'),
+            datetime.now(),
+            session_data.get('overall_score', 0),
+            session_data.get('technical_score', 0),
+            session_data.get('communication_score', 0),
+            session_data.get('problem_solving_score', 0),
+            session_data.get('recommendation', ''),
+            session_data.get('recommendation_reasoning', ''),
+            json.dumps(session_data.get('interview_data', {})),
+            session_id
+        )
+        
+        self.execute_query(query, params, fetch=False)
+        
+    def get_interview_session(self, session_id):
+        """Get details of an interview session"""
+        query = '''
+            SELECT 
+                is.id, is.evaluation_id, is.sap_module, is.status,
+                is.start_time, is.end_time, is.overall_score, 
+                is.technical_score, is.communication_score, is.problem_solving_score,
+                is.recommendation, is.recommendation_reasoning, is.interview_data,
+                ev.candidate_name, ev.resume_name, ev.job_id,
+                jd.title as job_title, jd.description as job_description
+            FROM interview_sessions is
+            JOIN evaluations ev ON is.evaluation_id = ev.id
+            JOIN job_descriptions jd ON ev.job_id = jd.id
+            WHERE is.id = %s
+        '''
+        
+        result = self.execute_query(query, (session_id,), cursor_factory=psycopg2.extras.DictCursor)
+        if result and len(result) > 0:
+            row = result[0]
+            return {
+                'id': row['id'],
+                'evaluation_id': row['evaluation_id'],
+                'sap_module': row['sap_module'],
+                'status': row['status'],
+                'start_time': row['start_time'],
+                'end_time': row['end_time'],
+                'overall_score': row['overall_score'],
+                'technical_score': row['technical_score'],
+                'communication_score': row['communication_score'],
+                'problem_solving_score': row['problem_solving_score'],
+                'recommendation': row['recommendation'],
+                'recommendation_reasoning': row['recommendation_reasoning'],
+                'interview_data': json.loads(row['interview_data']) if row['interview_data'] else {},
+                'candidate_name': row['candidate_name'],
+                'resume_name': row['resume_name'],
+                'job_id': row['job_id'],
+                'job_title': row['job_title'],
+                'job_description': row['job_description']
+            }
+        return None
+        
+    def get_interview_transcript(self, session_id):
+        """Get the full transcript of an interview session with questions and responses"""
+        query = '''
+            SELECT 
+                q.id as question_id, q.question_type, q.question_text, q.display_order,
+                r.id as response_id, r.response_text, r.score, r.strengths, 
+                r.weaknesses, r.evaluation_notes, r.follow_up, r.response_time, r.created_at
+            FROM interview_questions q
+            LEFT JOIN interview_responses r ON q.id = r.question_id
+            WHERE q.session_id = %s
+            ORDER BY q.question_type, q.display_order
+        '''
+        
+        result = self.execute_query(query, (session_id,), cursor_factory=psycopg2.extras.DictCursor)
+        transcript = []
+        
+        for row in result:
+            transcript.append({
+                'question_id': row['question_id'],
+                'question_type': row['question_type'],
+                'question': row['question_text'],
+                'order': row['display_order'],
+                'response_id': row['response_id'],
+                'response': row['response_text'],
+                'score': row['score'],
+                'strengths': row['strengths'],
+                'weaknesses': row['weaknesses'],
+                'evaluation_notes': row['evaluation_notes'],
+                'follow_up': row['follow_up'],
+                'response_time': row['response_time'],
+                'response_time_formatted': f"{row['response_time'] // 60}m {row['response_time'] % 60}s" if row['response_time'] else "",
+                'timestamp': row['created_at']
+            })
+            
+        return transcript
+        
+    def get_pending_interviews(self):
+        """Get all pending interview sessions"""
+        query = '''
+            SELECT 
+                is.id, is.evaluation_id, is.sap_module, is.status,
+                is.created_at, ev.candidate_name, jd.title as job_title
+            FROM interview_sessions is
+            JOIN evaluations ev ON is.evaluation_id = ev.id
+            JOIN job_descriptions jd ON ev.job_id = jd.id
+            WHERE is.status = 'pending'
+            ORDER BY is.created_at DESC
+        '''
+        
+        result = self.execute_query(query, cursor_factory=psycopg2.extras.DictCursor)
+        return [dict(row) for row in result]
+        
+    def get_completed_interviews(self):
+        """Get all completed interview sessions"""
+        query = '''
+            SELECT 
+                is.id, is.evaluation_id, is.sap_module, is.status,
+                is.start_time, is.end_time, is.overall_score, is.recommendation,
+                ev.candidate_name, jd.title as job_title
+            FROM interview_sessions is
+            JOIN evaluations ev ON is.evaluation_id = ev.id
+            JOIN job_descriptions jd ON ev.job_id = jd.id
+            WHERE is.status = 'completed'
+            ORDER BY is.end_time DESC
+        '''
+        
+        result = self.execute_query(query, cursor_factory=psycopg2.extras.DictCursor)
+        return [dict(row) for row in result]

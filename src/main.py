@@ -1191,7 +1191,7 @@ def show_interviews():
                                 st.session_state.interview_complete = False
                                 if 'response_start_time' in st.session_state:
                                     del st.session_state.response_start_time
-                                st.experimental_rerun()
+                                st.rerun()
     
     with tab2:
         st.subheader("Interview History")

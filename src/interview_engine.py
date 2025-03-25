@@ -280,7 +280,8 @@ class InterviewEngine:
                               sap_module: str,
                               job_description: str,
                               resume_text: str,
-                              interview_transcript: List[Dict[str, Any]]) -> Dict[str, Any]:
+                              interview_transcript: List[Dict[str, Any]],
+                              total_questions: int = None) -> Dict[str, Any]:
         """
         Generate a final comprehensive report after the interview.
         
@@ -289,6 +290,7 @@ class InterviewEngine:
             job_description: The full job description
             resume_text: The candidate's resume text
             interview_transcript: List of Q&A pairs with evaluations from the interview
+            total_questions: Total number of questions in the interview plan
             
         Returns:
             Dict containing the final comprehensive evaluation
@@ -300,6 +302,18 @@ class InterviewEngine:
                 transcript_text += f"Q{i+1}: {qa.get('question', '')}\n"
                 transcript_text += f"A{i+1}: {qa.get('answer', '')}\n"
                 transcript_text += f"Evaluation: Score {qa.get('evaluation', {}).get('score', 'N/A')}/10\n\n"
+            
+            # Calculate completion percentage
+            answered_questions = len(interview_transcript)
+            completion_percentage = 0
+            
+            if total_questions and total_questions > 0:
+                completion_percentage = (answered_questions / total_questions) * 100
+            else:
+                # If total_questions is not provided, estimate based on standard interview format
+                # Assuming a standard interview would have 10 questions
+                estimated_total = 10
+                completion_percentage = (answered_questions / estimated_total) * 100
             
             # Define module-specific evaluation criteria
             module_evaluation_guide = {
@@ -322,6 +336,14 @@ class InterviewEngine:
             prompt = f"""
             You are an SAP {sap_module} Principal Consultant and technical hiring manager with 15+ years of implementation experience. Generate a comprehensive final evaluation report for a candidate after their SAP module-specific interview.
             
+            IMPORTANT CONTEXT:
+            - The candidate answered {answered_questions} questions out of {total_questions or 'the expected number of'} questions.
+            - This represents approximately {completion_percentage:.1f}% completion of the full interview.
+            - Take this completion rate into serious consideration when making your final recommendation.
+            - If less than 70% of questions were answered, the candidate cannot receive a "Hire" recommendation.
+            - If less than 50% of questions were answered, the candidate should receive a "Do Not Hire" recommendation unless their answers were truly exceptional.
+            - If only 1-2 questions were answered, the assessment should clearly state that insufficient data was collected and recommend "Do Not Hire".
+            
             JOB DESCRIPTION:
             {job_description}
             
@@ -339,7 +361,9 @@ class InterviewEngine:
             Provide a final evaluation report in the following JSON format:
             
             {{
-                "overall_score": /* Overall score between 0-10 */,
+                "interview_completion_rate": {completion_percentage:.1f},
+                "data_sufficiency_assessment": /* Your assessment of whether enough data was collected to make a proper evaluation */,
+                "overall_score": /* Overall score between 0-10, should reflect completion rate */,
                 "technical_proficiency": {{
                     "score": /* Technical score between 0-10 */,
                     "assessment": /* Detailed assessment of technical skills in SAP {sap_module} */,
@@ -368,10 +392,10 @@ class InterviewEngine:
                 "areas_for_improvement": [
                     /* List of 3-5 specific areas for improvement with recommendations */
                 ],
-                "additional_observations": /* Any other important observations about the candidate */,
+                "additional_observations": /* Any other important observations about the candidate including remarks about the incomplete interview if applicable */,
                 "cultural_fit": /* Assessment of cultural fit and team collaboration potential based on behavioral responses */,
                 "hiring_recommendation": /* "Hire", "Consider", or "Do Not Hire" */,
-                "recommendation_reasoning": /* Detailed explanation for the hiring recommendation with specific reference to job requirements */
+                "recommendation_reasoning": /* Detailed explanation for the hiring recommendation with specific reference to job requirements and interview completion rate */
             }}
             
             In your assessment:
@@ -385,6 +409,7 @@ class InterviewEngine:
             8. Evaluate their ability to bridge technical concepts with business requirements
             9. Consider their ability to handle complex {sap_module} scenarios typical in enterprise implementations
             10. Assess whether they understand SAP best practices and why they exist
+            11. IMPORTANT: Factor in the interview completion rate in your final recommendation. If the interview was not fully completed, this should be noted as a significant limitation in your assessment.
             
             Be fair but critical in your final assessment, focusing on their demonstrated SAP {sap_module} expertise rather than general IT skills.
             """

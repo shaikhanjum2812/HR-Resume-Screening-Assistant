@@ -1072,11 +1072,16 @@ def show_interviews():
                             # Generate final report
                             transcript = st.session_state.interview_responses
                             
+                            # Calculate total number of questions
+                            questions = st.session_state.interview_questions
+                            total_questions = sum(len(q_list) for q_list in questions.values()) if questions else 10
+                            
                             final_report = st.session_state.components['interview_engine'].generate_final_report(
                                 sap_module=session_info['sap_module'],
                                 job_description=session_info['job_description'],
                                 resume_text=session_info['resume_name'],
-                                interview_transcript=transcript
+                                interview_transcript=transcript,
+                                total_questions=total_questions
                             )
                             
                             # Save final results to database
@@ -1089,6 +1094,8 @@ def show_interviews():
                                 'experience_score': final_report.get('experience_assessment', {}).get('score', 0),
                                 'recommendation': final_report.get('hiring_recommendation', ''),
                                 'recommendation_reasoning': final_report.get('recommendation_reasoning', ''),
+                                'completion_rate': final_report.get('interview_completion_rate', 0),
+                                'data_sufficiency': final_report.get('data_sufficiency_assessment', ''),
                                 'interview_data': final_report
                             }
                             
@@ -1100,6 +1107,21 @@ def show_interviews():
                             st.success("Interview completed successfully!")
                             
                             st.subheader("Interview Summary")
+                            
+                            # Show interview completion rate
+                            completion_rate = final_report.get('interview_completion_rate', 0)
+                            data_sufficiency = final_report.get('data_sufficiency_assessment', 'Unknown')
+                            
+                            # Create colored box for completion rate
+                            if completion_rate < 50:
+                                st.error(f"Interview Completion Rate: {completion_rate:.1f}%")
+                                st.error(f"Data Sufficiency: {data_sufficiency}")
+                            elif completion_rate < 80:
+                                st.warning(f"Interview Completion Rate: {completion_rate:.1f}%")
+                                st.warning(f"Data Sufficiency: {data_sufficiency}")
+                            else:
+                                st.success(f"Interview Completion Rate: {completion_rate:.1f}%")
+                                st.success(f"Data Sufficiency: {data_sufficiency}")
                             
                             # Overall score with progress bar
                             overall_score = final_report.get('overall_score', 0)
@@ -1247,6 +1269,22 @@ def show_interviews():
                             with col3:
                                 st.metric("Experience Score", f"{session.get('experience_score', 0)}/10")
                                 st.write("**SAP Module:** " + session['sap_module'])
+                                
+                            # Show completion rate if available
+                            if 'completion_rate' in session:
+                                completion_rate = session.get('completion_rate', 0)
+                                if completion_rate < 50:
+                                    st.error(f"Interview Completion Rate: {completion_rate:.1f}%")
+                                    if 'data_sufficiency' in session:
+                                        st.error(f"Data Sufficiency: {session.get('data_sufficiency', 'Limited')}")
+                                elif completion_rate < 80:
+                                    st.warning(f"Interview Completion Rate: {completion_rate:.1f}%")
+                                    if 'data_sufficiency' in session:
+                                        st.warning(f"Data Sufficiency: {session.get('data_sufficiency', 'Partial')}")
+                                else:
+                                    st.success(f"Interview Completion Rate: {completion_rate:.1f}%")
+                                    if 'data_sufficiency' in session:
+                                        st.success(f"Data Sufficiency: {session.get('data_sufficiency', 'Complete')}")
                             
                             st.write(f"**Recommendation:** {session['recommendation']}")
                             st.write(f"**Reasoning:** {session['recommendation_reasoning']}")

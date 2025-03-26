@@ -67,8 +67,8 @@ def setup_interview_page():
             # Job Description file upload
             st.subheader("Job Description")
             jd_file = st.file_uploader(
-                "Upload Job Description (PDF/DOCX)",
-                type=["pdf", "docx"],
+                "Upload Job Description (Any file type)",
+                type=None,
                 help="Upload a detailed job description document",
                 key="jd_file_input"
             )
@@ -135,8 +135,8 @@ def setup_interview_page():
             
             # Resume file upload with drag-and-drop
             resume_file = st.file_uploader(
-                "Upload Resume (PDF/DOCX)",
-                type=["pdf", "docx"],
+                "Upload Resume (Any file type)",
+                type=None,
                 help="Upload the candidate's resume or CV",
                 key="resume_file_input"
             )

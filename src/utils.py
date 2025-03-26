@@ -46,25 +46,68 @@ def save_uploaded_file(uploaded_file):
 
 def extract_text_from_upload(uploaded_file):
     """
-    Extract text from an uploaded file (supports PDF, DOCX, and text files).
+    Extract text from an uploaded file (supports various file types).
     """
     try:
-        if uploaded_file.type == "application/pdf":
+        # Get the file extension and mime type
+        file_extension = os.path.splitext(uploaded_file.name)[1].lower() if uploaded_file.name else ""
+        mime_type = uploaded_file.type if hasattr(uploaded_file, 'type') else ""
+        
+        # Try to process based on mime type first
+        if mime_type == "application/pdf" or file_extension == ".pdf":
             # Save PDF temporarily and extract text
             file_path = save_uploaded_file(uploaded_file)
-            text = parse_pdf(file_path)
-            os.remove(file_path)  # Clean up temporary file
+            try:
+                text = parse_pdf(file_path)
+            except Exception as e:
+                # If parsing fails, return a placeholder
+                text = f"[PDF Content - Unable to extract text: {str(e)}]"
+            finally:
+                os.remove(file_path)  # Clean up temporary file
             return text
-        elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            
+        elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or file_extension == ".docx":
             # Save DOCX temporarily and extract text
             file_path = save_uploaded_file(uploaded_file)
-            text = parse_docx(file_path)
-            os.remove(file_path)  # Clean up temporary file
+            try:
+                text = parse_docx(file_path)
+            except Exception as e:
+                # If parsing fails, return a placeholder
+                text = f"[DOCX Content - Unable to extract text: {str(e)}]"
+            finally:
+                os.remove(file_path)  # Clean up temporary file
             return text
-        elif uploaded_file.type == "text/plain":
+            
+        elif mime_type == "text/plain" or file_extension in [".txt", ".csv", ".md", ".json"]:
             # Read text file directly
-            return uploaded_file.getvalue().decode("utf-8")
+            try:
+                return uploaded_file.getvalue().decode("utf-8")
+            except UnicodeDecodeError:
+                # Try with different encodings
+                try:
+                    return uploaded_file.getvalue().decode("latin-1")
+                except:
+                    return "[Text Content - Unable to decode with supported encodings]"
+                    
         else:
-            raise ValueError("Unsupported file type. Please upload a PDF, DOCX, or text file.")
+            # For unsupported file types, save and try to extract anyway
+            try:
+                # First try as PDF
+                file_path = save_uploaded_file(uploaded_file)
+                try:
+                    text = parse_pdf(file_path)
+                    return text
+                except:
+                    # If not PDF, try as DOCX
+                    try:
+                        text = parse_docx(file_path)
+                        return text
+                    except:
+                        # If both fail, return file info
+                        return f"[Uploaded file: {uploaded_file.name} ({mime_type}) - Unable to extract text content]"
+                finally:
+                    os.remove(file_path)  # Clean up temporary file
+            except:
+                return f"[Uploaded file: {uploaded_file.name} - Unable to process]"
     except Exception as e:
         raise Exception(f"Failed to extract text from file: {e}")

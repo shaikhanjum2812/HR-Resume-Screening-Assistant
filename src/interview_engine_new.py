@@ -442,6 +442,31 @@ class InterviewEngine:
             
         except Exception as e:
             logger.error(f"Error generating final report: {str(e)}")
+            
+            # Define default values to avoid "possibly unbound" errors
+            default_completion_rate = 0
+            try:
+                # Try to use the existing completion_rate if it exists
+                completion_percentage = int(completion_rate * 100)
+            except:
+                # Otherwise use the default value
+                completion_percentage = 0
+                
+            default_scores = {
+                "overall": 0,
+                "technical": 0,
+                "scenario": 0,
+                "behavioral": 0,
+                "problem_solving": 0
+            }
+            
+            try:
+                # Try to use the existing scores if they exist
+                scores = formatted_data["scores"]
+            except:
+                # Otherwise use the default scores
+                scores = default_scores
+            
             # Return a basic structure in case of failure
             return {
                 "overall_assessment": "Could not generate a comprehensive assessment due to an error.",
@@ -460,16 +485,10 @@ class InterviewEngine:
                 "areas_for_improvement": ["Unable to determine areas for improvement"],
                 "key_observations": ["System encountered an error during final assessment"],
                 "interview_completion": {
-                    "assessment": f"The candidate completed {int(completion_rate * 100)}% of the interview questions."
+                    "assessment": f"The candidate completed {completion_percentage}% of the interview questions."
                 },
                 "recommendation": "Unable to determine",
                 "reasoning": f"An error occurred during the final assessment: {str(e)}",
-                "scores": formatted_data["scores"] if 'formatted_data' in locals() else {
-                    "overall": 0,
-                    "technical": 0,
-                    "scenario": 0,
-                    "behavioral": 0,
-                    "problem_solving": 0
-                },
-                "completion_rate": completion_rate if 'completion_rate' in locals() else 0
+                "scores": scores,
+                "completion_rate": default_completion_rate if 'completion_rate' not in locals() else completion_rate
             }

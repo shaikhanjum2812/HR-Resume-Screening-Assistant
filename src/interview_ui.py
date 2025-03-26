@@ -561,10 +561,11 @@ def interview_interface():
     </div>
     """, unsafe_allow_html=True)
     
-    col1, col2 = st.columns([1, 1])
+    # Create three columns for the action buttons
+    col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
-        if st.button("Submit Response"):
+        if st.button("Submit Response", use_container_width=True):
             if not answer_text.strip():
                 st.error("Please enter a response before submitting")
             else:
@@ -611,7 +612,43 @@ def interview_interface():
                         st.error(f"Error processing response: {str(e)}")
     
     with col2:
-        if st.button("End Interview Early"):
+        if st.button("Next Question ➡️", use_container_width=True):
+            # Mark the question as skipped with a minimal evaluation
+            with st.spinner("Skipping to next question..."):
+                try:
+                    # Save a minimal response indicating question was skipped
+                    answer_data = {
+                        'answer_text': "[Question skipped by interviewer]",
+                        'evaluation': {
+                            'score': 0,
+                            'feedback': "This question was skipped.",
+                            'improvement_suggestions': "",
+                            'strengths': "",
+                            'weaknesses': "Question was not attempted."
+                        },
+                        'response_time': 0,
+                        'skipped': True
+                    }
+                    
+                    st.session_state.components['db'].save_interview_answer(
+                        question_id=current_question['id'],
+                        answer_data=answer_data
+                    )
+                    
+                    # Reset timer and refresh
+                    if 'response_start_time' in st.session_state:
+                        del st.session_state.response_start_time
+                        
+                    st.success("Question skipped!")
+                    time.sleep(1)  # Brief pause to show success message
+                    st.rerun()
+                    
+                except Exception as e:
+                    logger.error(f"Error skipping question: {str(e)}")
+                    st.error(f"Error skipping question: {str(e)}")
+    
+    with col3:
+        if st.button("End Interview", use_container_width=True):
             if answered_questions > 0:
                 if st.button("Confirm End Interview", key="confirm_end"):
                     st.session_state.interview_complete = True

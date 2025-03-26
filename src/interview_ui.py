@@ -978,29 +978,45 @@ def display_interview_report(interview):
                 if not qa.get('answer'):
                     continue  # Skip unanswered questions
                     
-                with st.expander(f"Q{i+1}: {qa['question'][:80]}..."):
+                # Check if the question was skipped
+                answer = qa['answer']
+                is_skipped = answer.get('skipped', False)
+                
+                # Add visual indicator for skipped questions
+                question_prefix = f"Q{i+1}: "
+                if is_skipped:
+                    question_prefix = f"Q{i+1} [SKIPPED]: "
+                
+                with st.expander(f"{question_prefix}{qa['question'][:80]}..."):
                     st.write(f"**Question:** {qa['question']}")
                     st.write(f"**Type:** {qa['type'].capitalize()}")
                     
-                    answer = qa['answer']
-                    st.write(f"**Response:** {answer['text']}")
+                    if is_skipped:
+                        st.warning("This question was skipped during the interview.")
+                        st.write(f"**Response:** {answer['text']}")
+                        st.write("**Score:** 0/10 (skipped questions do not contribute to final score)")
+                    else:
+                        st.write(f"**Response:** {answer['text']}")
+                        evaluation = answer.get('evaluation', {})
+                        st.write(f"**Score:** {evaluation.get('score', 0)}/10")
                     
                     evaluation = answer.get('evaluation', {})
-                    st.write(f"**Score:** {evaluation.get('score', 0)}/10")
                     
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.write("**Strengths:**")
-                        for strength in evaluation.get('strengths', []):
-                            st.write(f"- {strength}")
-                            
-                    with col2:
-                        st.write("**Areas for Improvement:**")
-                        for weakness in evaluation.get('weaknesses', []):
-                            st.write(f"- {weakness}")
-                            
-                    st.write(f"**Feedback:** {evaluation.get('feedback', 'No feedback provided')}")
+                    # Don't show detailed feedback for skipped questions
+                    if not is_skipped:
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write("**Strengths:**")
+                            for strength in evaluation.get('strengths', []):
+                                st.write(f"- {strength}")
+                                
+                        with col2:
+                            st.write("**Areas for Improvement:**")
+                            for weakness in evaluation.get('weaknesses', []):
+                                st.write(f"- {weakness}")
+                                
+                        st.write(f"**Feedback:** {evaluation.get('feedback', 'No feedback provided')}")
                     
                     if 'response_time' in answer:
                         response_time = answer['response_time']

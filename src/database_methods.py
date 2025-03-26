@@ -146,6 +146,7 @@ def save_interview_answer(self, question_id, answer_data):
     """
     try:
         evaluation = answer_data.get('evaluation', {})
+        is_skipped = answer_data.get('skipped', False)
         
         # Extract data from the evaluation
         query = """
@@ -160,8 +161,9 @@ def save_interview_answer(self, question_id, answer_data):
                 strengths,
                 weaknesses,
                 feedback,
-                response_time
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                response_time,
+                is_skipped
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """
         
@@ -182,7 +184,8 @@ def save_interview_answer(self, question_id, answer_data):
                 strengths,
                 weaknesses,
                 evaluation.get('feedback', ''),
-                answer_data.get('response_time', 0)
+                answer_data.get('response_time', 0),
+                is_skipped
             )
         )
         
@@ -225,7 +228,8 @@ def get_interview_answers(self, interview_id):
                 a.weaknesses,
                 a.feedback,
                 a.response_time,
-                a.answered_at
+                a.answered_at,
+                a.is_skipped
             FROM interview_questions_new q
             LEFT JOIN interview_answers a ON q.id = a.question_id
             WHERE q.interview_id = %s
@@ -259,6 +263,9 @@ def get_interview_answers(self, interview_id):
             # Construct response
             answer_data = None
             if row[5]:  # answer_text exists
+                # Check if the answer was skipped (will be at index 16 after our change)
+                is_skipped = row[16] if len(row) > 16 else False
+                
                 answer_data = {
                     'id': row[4],  # answer_id
                     'text': row[5],  # answer_text
@@ -273,7 +280,8 @@ def get_interview_answers(self, interview_id):
                         'feedback': row[13]
                     },
                     'response_time': row[14],
-                    'timestamp': row[15]
+                    'timestamp': row[15],
+                    'skipped': is_skipped
                 }
             
             questions_with_answers.append({

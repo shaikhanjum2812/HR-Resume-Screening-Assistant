@@ -45,12 +45,46 @@ class Database:
 
     @contextmanager
     def get_connection(self):
-        """Context manager for database connections"""
-        conn = self.pool.getconn()
+        """Context manager for database connections with improved error handling"""
+        conn = None
         try:
+            conn = self.pool.getconn()
+            
+            # Test if connection is alive
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+            except Exception as e:
+                logger.warning(f"Connection test failed, reconnecting: {e}")
+                # Close the bad connection if possible
+                try:
+                    conn.close()
+                except:
+                    pass
+                
+                # Try to reinitialize pool
+                self.pool = SimpleConnectionPool(
+                    minconn=1,
+                    maxconn=10,
+                    dsn=os.environ['DATABASE_URL']
+                )
+                conn = self.pool.getconn()
+                
             yield conn
+        except Exception as e:
+            logger.error(f"Connection error in get_connection: {e}")
+            raise
         finally:
-            self.pool.putconn(conn)
+            if conn is not None:
+                try:
+                    self.pool.putconn(conn)
+                except Exception as e:
+                    logger.warning(f"Error returning connection to pool: {e}")
+                    # If we can't return it to the pool, try to close it
+                    try:
+                        conn.close()
+                    except:
+                        pass
 
     def create_tables(self):
         """Create necessary database tables if they don't exist"""
@@ -165,25 +199,71 @@ class Database:
                     conn.rollback()
                     raise
 
-    def execute_query(self, query, params=None, fetch=True, cursor_factory=None):
-        """Execute a query with proper connection handling"""
-        with self.get_connection() as conn:
-            with conn.cursor(cursor_factory=cursor_factory) as cursor:
+    def execute_query(self, query, params=None, fetch=True, cursor_factory=None, max_retries=3):
+        """Execute a query with proper connection handling and retry logic"""
+        retries = 0
+        last_error = None
+        
+        while retries < max_retries:
+            try:
+                with self.get_connection() as conn:
+                    # Test if connection is still alive
+                    if conn.closed:
+                        logger.warning("Connection was closed, attempting to reconnect...")
+                        # Clear the pool and reinitialize
+                        self.pool = SimpleConnectionPool(
+                            minconn=1,
+                            maxconn=10,
+                            dsn=os.environ['DATABASE_URL']
+                        )
+                        continue  # Retry with the new connection
+                        
+                    with conn.cursor(cursor_factory=cursor_factory) as cursor:
+                        cursor.execute(query, params or ())
+                        if fetch:
+                            result = cursor.fetchall()
+                            # Return empty list if no results instead of None
+                            if result is None or len(result) == 0:
+                                return []
+                        else:
+                            result = None
+                        conn.commit()
+                        return result
+                        
+            except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                # These are connection-related errors, so we should retry
+                retries += 1
+                last_error = e
+                logger.warning(f"Database connection error (attempt {retries}/{max_retries}): {e}")
+                
+                # Try to reinitialize the connection pool
                 try:
-                    cursor.execute(query, params or ())
-                    if fetch:
-                        result = cursor.fetchall()
-                        # Return empty list if no results instead of None
-                        if result is None or len(result) == 0:
-                            return []
-                    else:
-                        result = None
-                    conn.commit()
-                    return result
-                except Exception as e:
-                    logger.error(f"Query execution error: {e}")
-                    conn.rollback()
-                    raise
+                    self.pool = SimpleConnectionPool(
+                        minconn=1,
+                        maxconn=10,
+                        dsn=os.environ['DATABASE_URL']
+                    )
+                except Exception as pool_error:
+                    logger.error(f"Failed to reinitialize connection pool: {pool_error}")
+                
+                # Wait a bit before retrying
+                import time
+                time.sleep(0.5 * retries)  # Exponential backoff
+                
+            except Exception as e:
+                # For other errors, log and raise immediately
+                logger.error(f"Query execution error: {e}")
+                try:
+                    # Only try to rollback if conn exists and is defined in this scope
+                    if 'conn' in locals() and conn is not None:
+                        conn.rollback()
+                except Exception as rollback_error:
+                    logger.warning(f"Failed to rollback transaction: {rollback_error}")
+                raise
+        
+        # If we've exhausted all retries
+        logger.error(f"Query failed after {max_retries} attempts. Last error: {last_error}")
+        raise last_error or Exception("Failed to execute database query after multiple attempts")
 
     def get_evaluations_by_period(self, period):
         if period == 'week':

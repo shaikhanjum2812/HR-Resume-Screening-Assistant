@@ -1,0 +1,57 @@
+Create an interactive interview system with the following components:
+
+1. **Initial Setup Page**:
+   - Fields for:
+     * Role/Position (dropdown with common tech roles: Frontend Developer, Backend Developer, Data Scientist, etc.)
+     * Job Description (text area for pasting JD)
+     * Resume/CV (text area for pasting resume text)
+   - "Generate Questions" button that analyzes all inputs and creates tailored questions
+
+2. **Question Generation Logic**:
+   - Generate 20 total questions with:
+     * 75% focused on job description and required skills/areas
+     * 25% on general behavioral/soft skills
+   - Questions should be:
+     * Technical: Specific to role requirements
+     * Scenario-based: "How would you handle X situation?"
+     * Problem-solving: "Explain how you would solve X problem"
+     * Behavioral: "Tell me about a time when..."
+
+3. **Interview Interface**:
+   - Clean, distraction-free interface showing:
+     * Question number (1/20)
+     * Current question (large text)
+     * Text area for answer (with disabled copy/paste functionality)
+     * Character counter
+     * "Next Question" button
+   - Timer showing elapsed time
+   - Progress bar
+
+4. **Evaluation System**:
+   - After final question:
+     * Generate detailed feedback for each answer assessing:
+       - Technical accuracy
+       - Clarity of communication
+       - Relevance to question
+       - Demonstrated expertise
+     * Provide an overall score (0-100) with breakdown:
+       - Technical skills (50%)
+       - Problem-solving (30%)
+       - Communication (20%)
+   - "Download Report" button (PDF/HTML)
+
+5. **Additional Features**:
+   - Session persistence (save progress if interrupted)
+   - Voice-to-text answer option
+   - Accessibility features (font size adjustment, high contrast mode)
+
+Technical Requirements:
+- Implement copy/paste prevention in answer fields
+- Store interview data temporarily (no permanent storage needed)
+
+
+Design Guidelines:
+- Professional color scheme (blues/grays)
+- Clear visual hierarchy
+- Minimal distractions during interview
+- Accessible typography

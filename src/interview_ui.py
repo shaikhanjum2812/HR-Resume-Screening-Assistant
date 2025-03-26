@@ -83,278 +83,275 @@ def setup_interview_page():
     # Add accessibility controls
     add_accessibility_controls()
     
-    st.title("AI-Powered Interview System")
-    st.markdown("### Comprehensive skills assessment platform for technical hiring")
-    
     # Create a container with a light background and padding
     setup_container = st.container()
     with setup_container:
         st.markdown("---")
         
-        # Layout for job description and resume
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("Job Position")
-            
-            # Define tech roles for dropdown
-            tech_roles = [
-                "Frontend Developer", 
-                "Backend Developer", 
-                "Full Stack Developer",
-                "Data Scientist", 
-                "Machine Learning Engineer",
-                "DevOps Engineer", 
-                "Site Reliability Engineer",
-                "Mobile Developer",
-                "UI/UX Designer",
-                "QA Engineer",
-                "Software Architect",
-                "Product Manager",
-                "Technical Project Manager",
-                "Data Engineer",
-                "Cloud Engineer",
-                "Blockchain Developer",
-                "Security Engineer",
-                "Database Administrator",
-                "Network Engineer",
-                "Other (specify below)"
-            ]
-            
-            # Role selection with dropdown
-            selected_role = st.selectbox(
-                "Select Role/Position", 
-                options=tech_roles,
-                help="Choose the technical role for this interview"
-            )
-            
-            # If "Other" is selected, allow custom entry
-            if selected_role == "Other (specify below)":
-                custom_role = st.text_input("Specify Role", key="custom_role_input")
-                job_title = custom_role if custom_role else "Custom Role"
-            else:
-                job_title = selected_role
-                
-            # Job Description file upload
-            st.subheader("Job Description")
-            jd_file = st.file_uploader(
-                "Upload Job Description (Any file type)",
-                type=None,
-                help="Upload a detailed job description document",
-                key="jd_file_input"
-            )
-            
-            # File validation info
-            if jd_file is not None:
-                col_size, col_type = st.columns(2)
-                with col_size:
-                    file_size_mb = jd_file.size / (1024 * 1024)
-                    if file_size_mb > 5:
-                        st.error(f"File size: {file_size_mb:.2f}MB (exceeds 5MB limit)")
-                    else:
-                        st.success(f"File size: {file_size_mb:.2f}MB")
-                
-                with col_type:
-                    st.success(f"File type: {jd_file.type}")
-                
-                # Process job description file
-                try:
-                    with st.spinner("Extracting job description..."):
-                        if st.session_state.components.get('utils'):
-                            jd_text = st.session_state.components['utils'].extract_text_from_upload(jd_file)
-                            st.session_state.jd_text = jd_text
-                            
-                            # Parse key information from JD
-                            with st.expander("Extracted Job Information (Verify)", expanded=True):
-                                st.write(f"**Job Title:** {job_title}")
-                                if len(jd_text) > 500:
-                                    st.write("**Summary:**")
-                                    st.write(jd_text[:500] + "...")
-                                else:
-                                    st.write(jd_text)
-                                st.success("✓ Job description processed successfully")
-                        else:
-                            st.error("Utils component not initialized")
-                except Exception as e:
-                    logger.error(f"Error processing job description file: {str(e)}")
-                    st.error(f"Error processing job description file: {str(e)}")
-            
-            # Or enter job description manually
-            jd_placeholder = (
-                "Paste the detailed job description here, including:\n"
-                "- Required skills and qualifications\n"
-                "- Responsibilities and duties\n"
-                "- Technical requirements\n"
-                "- Experience level needed"
-            )
-            
-            st.write("Or enter job description manually")
-            job_description = st.text_area(
-                "Job Description Details",
-                height=250,
-                placeholder=jd_placeholder,
-                help="Enter the complete job description with all requirements",
-                key="job_description_input"
-            )
-            
-            # Use processed text if available
-            if jd_file is not None and not job_description.strip() and 'jd_text' in st.session_state:
-                job_description = st.session_state.jd_text
-        
-        with col2:
-            st.subheader("Candidate Resume/CV")
-            
-            # Resume file upload with drag-and-drop
-            resume_file = st.file_uploader(
-                "Upload Resume (Any file type)",
-                type=None,
-                help="Upload the candidate's resume or CV",
-                key="resume_file_input"
-            )
-            
-            # File validation info
-            if resume_file is not None:
-                col_size, col_type = st.columns(2)
-                with col_size:
-                    file_size_mb = resume_file.size / (1024 * 1024)
-                    if file_size_mb > 5:
-                        st.error(f"File size: {file_size_mb:.2f}MB (exceeds 5MB limit)")
-                    else:
-                        st.success(f"File size: {file_size_mb:.2f}MB")
-                
-                with col_type:
-                    st.success(f"File type: {resume_file.type}")
-                
-                # Process resume file
-                try:
-                    with st.spinner("Processing resume..."):
-                        if st.session_state.components.get('utils'):
-                            resume_text = st.session_state.components['utils'].extract_text_from_upload(resume_file)
-                            st.session_state.resume_text = resume_text
-                            
-                            # Parse key information from resume
-                            with st.expander("Extracted Resume Information (Verify)", expanded=True):
-                                if len(resume_text) > 500:
-                                    st.write("**Summary:**")
-                                    st.write(resume_text[:500] + "...")
-                                else:
-                                    st.write(resume_text)
-                                st.success("✓ Resume processed successfully")
-                        else:
-                            st.error("Utils component not initialized")
-                except Exception as e:
-                    logger.error(f"Error processing resume file: {str(e)}")
-                    st.error(f"Error processing resume file: {str(e)}")
-            
-            # Or enter resume text manually
-            resume_placeholder = (
-                "Paste the candidate's resume here, including:\n"
-                "- Work experience\n"
-                "- Education\n"
-                "- Technical skills\n"
-                "- Projects and accomplishments\n"
-                "- Certifications"
-            )
-            
-            st.write("Or enter resume text manually")
-            resume_text = st.text_area(
-                "Resume Content",
-                height=250,
-                placeholder=resume_placeholder,
-                help="Enter the complete resume content",
-                key="resume_text_input"
-            )
-            
-            # Use processed text if available
-            if resume_file is not None and not resume_text.strip() and 'resume_text' in st.session_state:
-                resume_text = st.session_state.resume_text
+        # First: Job Position
+        st.subheader("Job Position")
     
-    st.subheader("Interview Configuration")
-    num_questions = st.slider(
-        "Number of Questions", 
-        min_value=5, 
-        max_value=40,
-        value=20, 
-        step=5,
-        help="Total number of questions for the interview"
-    )
+        # Define tech roles for dropdown
+        tech_roles = [
+            "Frontend Developer", 
+            "Backend Developer", 
+            "Full Stack Developer",
+            "Data Scientist", 
+            "Machine Learning Engineer",
+            "DevOps Engineer", 
+            "Site Reliability Engineer",
+            "Mobile Developer",
+            "UI/UX Designer",
+            "QA Engineer",
+            "Software Architect",
+            "Product Manager",
+            "Technical Project Manager",
+            "Data Engineer",
+            "Cloud Engineer",
+            "Blockchain Developer",
+            "Security Engineer",
+            "Database Administrator",
+            "Network Engineer",
+            "Other (specify below)"
+        ]
+        
+        # Role selection with dropdown
+        selected_role = st.selectbox(
+            "Select Role/Position", 
+            options=tech_roles,
+            help="Choose the technical role for this interview"
+        )
+        
+        # If "Other" is selected, allow custom entry
+        if selected_role == "Other (specify below)":
+            custom_role = st.text_input("Specify Role", key="custom_role_input")
+            job_title = custom_role if custom_role else "Custom Role"
+        else:
+            job_title = selected_role
+        
+        # Second: Candidate Resume/CV 
+        st.markdown("---")
+        st.subheader("Candidate Resume/CV")
+        
+        # Resume file upload with drag-and-drop
+        resume_file = st.file_uploader(
+            "Upload Resume (Any file type)",
+            type=None,
+            help="Upload the candidate's resume or CV",
+            key="resume_file_input"
+        )
+        
+        # File validation info
+        if resume_file is not None:
+            col_size, col_type = st.columns(2)
+            with col_size:
+                file_size_mb = resume_file.size / (1024 * 1024)
+                if file_size_mb > 5:
+                    st.error(f"File size: {file_size_mb:.2f}MB (exceeds 5MB limit)")
+                else:
+                    st.success(f"File size: {file_size_mb:.2f}MB")
+            
+            with col_type:
+                st.success(f"File type: {resume_file.type}")
+            
+            # Process resume file
+            try:
+                with st.spinner("Processing resume..."):
+                    if st.session_state.components.get('utils'):
+                        resume_text = st.session_state.components['utils'].extract_text_from_upload(resume_file)
+                        st.session_state.resume_text = resume_text
+                        
+                        # Parse key information from resume
+                        with st.expander("Extracted Resume Information (Verify)", expanded=True):
+                            if len(resume_text) > 500:
+                                st.write("**Summary:**")
+                                st.write(resume_text[:500] + "...")
+                            else:
+                                st.write(resume_text)
+                            st.success("✓ Resume processed successfully")
+                    else:
+                        st.error("Utils component not initialized")
+            except Exception as e:
+                logger.error(f"Error processing resume file: {str(e)}")
+                st.error(f"Error processing resume file: {str(e)}")
+        
+        # Or enter resume text manually
+        resume_placeholder = (
+            "Paste the candidate's resume here, including:\n"
+            "- Work experience\n"
+            "- Education\n"
+            "- Technical skills\n"
+            "- Projects and accomplishments\n"
+            "- Certifications"
+        )
+        
+        st.write("Or enter resume text manually")
+        resume_text = st.text_area(
+            "Resume Content",
+            height=250,
+            placeholder=resume_placeholder,
+            help="Enter the complete resume content",
+            key="resume_text_input"
+        )
+        
+        # Use processed text if available
+        if resume_file is not None and not resume_text.strip() and 'resume_text' in st.session_state:
+            resume_text = st.session_state.resume_text
+        
+        # Third: Job Description
+        st.markdown("---")
+        st.subheader("Job Description")
+        jd_file = st.file_uploader(
+            "Upload Job Description (Any file type)",
+            type=None,
+            help="Upload a detailed job description document",
+            key="jd_file_input"
+        )
+        
+        # File validation info
+        if jd_file is not None:
+            col_size, col_type = st.columns(2)
+            with col_size:
+                file_size_mb = jd_file.size / (1024 * 1024)
+                if file_size_mb > 5:
+                    st.error(f"File size: {file_size_mb:.2f}MB (exceeds 5MB limit)")
+                else:
+                    st.success(f"File size: {file_size_mb:.2f}MB")
+            
+            with col_type:
+                st.success(f"File type: {jd_file.type}")
+            
+            # Process job description file
+            try:
+                with st.spinner("Extracting job description..."):
+                    if st.session_state.components.get('utils'):
+                        jd_text = st.session_state.components['utils'].extract_text_from_upload(jd_file)
+                        st.session_state.jd_text = jd_text
+                        
+                        # Parse key information from JD
+                        with st.expander("Extracted Job Information (Verify)", expanded=True):
+                            st.write(f"**Job Title:** {job_title}")
+                            if len(jd_text) > 500:
+                                st.write("**Summary:**")
+                                st.write(jd_text[:500] + "...")
+                            else:
+                                st.write(jd_text)
+                            st.success("✓ Job description processed successfully")
+                    else:
+                        st.error("Utils component not initialized")
+            except Exception as e:
+                logger.error(f"Error processing job description file: {str(e)}")
+                st.error(f"Error processing job description file: {str(e)}")
+        
+        # Or enter job description manually
+        jd_placeholder = (
+            "Paste the detailed job description here, including:\n"
+            "- Required skills and qualifications\n"
+            "- Responsibilities and duties\n"
+            "- Technical requirements\n"
+            "- Experience level needed"
+        )
+        
+        st.write("Or enter job description manually")
+        job_description = st.text_area(
+            "Job Description Details",
+            height=250,
+            placeholder=jd_placeholder,
+            help="Enter the complete job description with all requirements",
+            key="job_description_input"
+        )
+        
+        # Use processed text if available
+        if jd_file is not None and not job_description.strip() and 'jd_text' in st.session_state:
+            job_description = st.session_state.jd_text
+        
+        st.markdown("---")
+        st.subheader("Interview Configuration")
+        num_questions = st.slider(
+            "Number of Questions", 
+            min_value=5, 
+            max_value=40,
+            value=20, 
+            step=5,
+            help="Total number of questions for the interview"
+        )
     
-    # Start interview button
-    if st.button("Generate Interview Questions"):
-        if not job_title.strip():
-            st.error("Job title is required")
-            return
-            
-        if not job_description.strip():
-            st.error("Job description is required")
-            return
-            
-        if not resume_text.strip() and resume_file is None:
-            st.error("Please either upload a resume or enter resume text")
-            return
-            
-        # If we have file but not text, ensure text is extracted
-        if resume_file is not None and not resume_text.strip():
-            if 'resume_text' in st.session_state:
-                resume_text = st.session_state.resume_text
-            else:
-                st.error("Failed to process resume. Please enter resume text manually.")
+        # Start interview button
+        if st.button("Generate Interview Questions"):
+            if not job_title.strip():
+                st.error("Job title is required")
                 return
-            
-        # Create new interview in the database
-        try:
-            with st.spinner("Setting up interview..."):
-                # Save to database
-                interview_id = st.session_state.components['db'].create_new_interview(
-                    job_title=job_title,
-                    job_description=job_description,
-                    resume_text=resume_text
-                )
                 
-                if not interview_id:
-                    st.error("Failed to create interview session")
+            if not job_description.strip():
+                st.error("Job description is required")
+                return
+                
+            if not resume_text.strip() and resume_file is None:
+                st.error("Please either upload a resume or enter resume text")
+                return
+                
+            # If we have file but not text, ensure text is extracted
+            if resume_file is not None and not resume_text.strip():
+                if 'resume_text' in st.session_state:
+                    resume_text = st.session_state.resume_text
+                else:
+                    st.error("Failed to process resume. Please enter resume text manually.")
                     return
+                
+            # Create new interview in the database
+            try:
+                with st.spinner("Setting up interview..."):
+                    # Save to database
+                    interview_id = st.session_state.components['db'].create_new_interview(
+                        job_title=job_title,
+                        job_description=job_description,
+                        resume_text=resume_text
+                    )
                     
-                # Generate questions
-                questions_by_type = st.session_state.components['interview_engine'].generate_questions(
-                    job_title=job_title,
-                    job_description=job_description,
-                    resume_text=resume_text,
-                    num_questions=num_questions
-                )
-                
-                # Prepare questions for saving to database
-                all_questions = []
-                for q_type, questions in questions_by_type.items():
-                    for question in questions:
-                        all_questions.append({
-                            "question": question.get("question", ""),
-                            "type": q_type
-                        })
-                
-                # Save questions
-                success = st.session_state.components['db'].save_interview_questions_new(
-                    interview_id=interview_id,
-                    questions_data={"questions": all_questions}
-                )
-                
-                if not success:
-                    st.error("Failed to save interview questions")
-                    return
-                
-                # Store ID in session state and move to interview interface
-                st.session_state.current_interview_id = interview_id
-                st.session_state.interview_setup_complete = True
-                
-                st.success("Interview setup complete! Click below to start the interview.")
-                
-                # Button to proceed to interview
-                if st.button("Start Interview"):
-                    st.rerun()
-                
-        except Exception as e:
-            logger.error(f"Error setting up interview: {str(e)}")
-            st.error(f"Error setting up interview: {str(e)}")
+                    if not interview_id:
+                        st.error("Failed to create interview session")
+                        return
+                        
+                    # Generate questions
+                    questions_by_type = st.session_state.components['interview_engine'].generate_questions(
+                        job_title=job_title,
+                        job_description=job_description,
+                        resume_text=resume_text,
+                        num_questions=num_questions
+                    )
+                    
+                    # Prepare questions for saving to database
+                    all_questions = []
+                    for q_type, questions in questions_by_type.items():
+                        for question in questions:
+                            all_questions.append({
+                                "question": question.get("question", ""),
+                                "type": q_type
+                            })
+                    
+                    # Save questions
+                    success = st.session_state.components['db'].save_interview_questions_new(
+                        interview_id=interview_id,
+                        questions_data={"questions": all_questions}
+                    )
+                    
+                    if not success:
+                        st.error("Failed to save interview questions")
+                        return
+                    
+                    # Store ID in session state and move to interview interface
+                    st.session_state.current_interview_id = interview_id
+                    st.session_state.interview_setup_complete = True
+                    
+                    st.success("Interview setup complete! Click below to start the interview.")
+                    
+                    # Button to proceed to interview
+                    if st.button("Start Interview"):
+                        st.rerun()
+                    
+            except Exception as e:
+                logger.error(f"Error setting up interview: {str(e)}")
+                st.error(f"Error setting up interview: {str(e)}")
 
 def interview_interface():
     """Display the main interview interface"""

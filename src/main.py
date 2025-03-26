@@ -45,6 +45,18 @@ def initialize_components():
         logger.info("Initializing Interview Engine...")
         interview_engine = InterviewEngine()
         logger.info("Interview Engine initialization successful")
+        
+        # Initialize utils module
+        logger.info("Adding utils module for file processing...")
+        # We need a class-like object with the extract_text_from_upload method
+        class Utils:
+            def __init__(self):
+                pass
+                
+            def extract_text_from_upload(self, uploaded_file):
+                return extract_text_from_upload(uploaded_file)
+                
+        utils = Utils()
 
         return {
             'db': db,
@@ -52,7 +64,8 @@ def initialize_components():
             'pdf_processor': pdf_processor,
             'docx_processor': docx_processor,
             'analytics': analytics,
-            'interview_engine': interview_engine
+            'interview_engine': interview_engine,
+            'utils': utils
         }
     except Exception as e:
         logger.error(f"Failed to initialize components: {str(e)}")

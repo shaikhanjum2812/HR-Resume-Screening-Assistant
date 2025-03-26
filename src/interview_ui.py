@@ -670,90 +670,230 @@ def complete_interview():
             st.rerun()
 
 def display_interview_report(interview):
-    """Helper function to display the interview report"""
+    """Helper function to display the modern, minimalistic post-interview UI dashboard"""
     report_data = interview.get('report_data', {})
-    
-    st.title("Interview Assessment Report")
-    st.subheader(f"Position: {interview['job_title']}")
-    
-    # Show completion rate
-    completion_rate = interview.get('completion_rate', 0) * 100
-    if completion_rate < 50:
-        st.error(f"Interview Completion Rate: {completion_rate:.1f}%")
-    elif completion_rate < 80:
-        st.warning(f"Interview Completion Rate: {completion_rate:.1f}%")
-    else:
-        st.success(f"Interview Completion Rate: {completion_rate:.1f}%")
-    
-    # Overall assessment
-    st.subheader("Overall Assessment")
-    st.write(report_data.get('overall_assessment', 'No assessment available'))
-    
-    # Overall scores
+    completion_rate = report_data.get('completion_rate', 0)
     scores = report_data.get('scores', {})
     
-    st.subheader("Evaluation Scores")
-    col1, col2, col3, col4, col5 = st.columns(5)
+    # Custom CSS for modern UI
+    st.markdown("""
+    <style>
+    .success-header {
+        color: #0DB16E;
+        font-size: 36px;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 10px;
+        padding: 20px 0;
+    }
+    .interview-summary {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    .section-header {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+    .rating-container {
+        margin-top: 5px;
+        margin-bottom: 15px;
+    }
+    .star-rating {
+        font-size: 24px;
+        color: #FFC107;
+    }
+    .rating-empty {
+        color: #E0E0E0;
+    }
+    .progress-label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+    }
+    .progress-container {
+        margin-bottom: 20px;
+    }
+    .recommendation-box {
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+        font-weight: 600;
+        text-align: center;
+    }
+    .hire-recommendation {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    .consider-recommendation {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    .no-hire-recommendation {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Interview Completed Successfully Header
+    st.markdown('<div class="success-header">Interview Completed Successfully</div>', unsafe_allow_html=True)
+    
+    # Summary Section
+    st.markdown('<div class="interview-summary">', unsafe_allow_html=True)
+    
+    # Extract candidate name or use placeholder
+    candidate_name = "Candidate"
+    if "candidate_info" in report_data:
+        candidate_name = report_data.get("candidate_info", {}).get("name", "Candidate")
+    
+    # Calculate interview duration from report or use placeholder
+    interview_duration = report_data.get("interview_duration", "30 minutes")
+    
+    # Create two columns for candidate info and completion rate
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"""
+        <div style="margin-bottom: 10px;">
+            <strong>Candidate:</strong> {candidate_name}<br>
+            <strong>Position:</strong> {interview['job_title']}<br>
+            <strong>Duration:</strong> {interview_duration}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        # Display completion rate with progress bar
+        completion_percentage = int(completion_rate * 100)
+        st.markdown(f"""
+        <div style="margin-bottom: 10px;">
+            <strong>Interview Completion Rate:</strong> {completion_percentage}%
+        </div>
+        """, unsafe_allow_html=True)
+        st.progress(completion_rate)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Performance Breakdown Section
+    st.markdown('<div class="section-header">Performance Breakdown</div>', unsafe_allow_html=True)
+    
+    # Create scoring function for stars and percentage bars
+    def display_rating(category, score, max_score=10):
+        # Normalize score to 0-5 stars
+        star_score = min(5, max(0, round(score * 5 / max_score)))
+        percentage = int(score * 100 / max_score)
+        
+        # Create progress bar with percentage
+        st.markdown(f"""
+        <div class="progress-container">
+            <div class="progress-label">
+                <span><strong>{category}</strong></span>
+                <span>{percentage}%</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.progress(score/max_score)
+        
+        # Create star rating
+        stars_html = ""
+        for i in range(5):
+            if i < star_score:
+                stars_html += '★'
+            else:
+                stars_html += '☆'
+        
+        st.markdown(f"""
+        <div class="rating-container">
+            <span class="star-rating">{stars_html}</span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Display each category
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.metric("Overall", f"{scores.get('overall', 0)}/10")
-    with col2:
-        st.metric("Technical", f"{scores.get('technical', 0)}/10")
-    with col3:
-        st.metric("Scenario", f"{scores.get('scenario', 0)}/10")
-    with col4:
-        st.metric("Behavioral", f"{scores.get('behavioral', 0)}/10")
-    with col5:
-        st.metric("Problem Solving", f"{scores.get('problem_solving', 0)}/10")
+        display_rating("Technical Skills", scores.get('technical', 0))
+        display_rating("Communication", scores.get('behavioral', 0))
     
-    # Final recommendation
+    with col2:
+        display_rating("Problem-Solving", scores.get('problem_solving', 0))
+        display_rating("Overall Performance", scores.get('overall', 0))
+    
+    # Recommendation Section
     recommendation = report_data.get('recommendation', 'No recommendation')
-    st.subheader("Final Recommendation")
+    recommendation_class = "consider-recommendation"
     
     if recommendation.lower() == 'hire':
-        st.success(f"Recommendation: {recommendation}")
+        recommendation_class = "hire-recommendation"
     elif recommendation.lower() == 'do not hire':
-        st.error(f"Recommendation: {recommendation}")
-    else:
-        st.info(f"Recommendation: {recommendation}")
+        recommendation_class = "no-hire-recommendation"
     
+    st.markdown(f"""
+    <div class="recommendation-box {recommendation_class}">
+        Final Recommendation: {recommendation.upper()}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Reasoning
+    st.markdown('<div class="section-header">Assessment Summary</div>', unsafe_allow_html=True)
     st.write(report_data.get('reasoning', 'No reasoning provided'))
     
-    # Strengths and weaknesses
+    # Strengths and areas for improvement
     col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("Key Strengths")
         strengths = report_data.get('key_strengths', [])
         for strength in strengths:
-            st.write(f"- {strength}")
+            st.markdown(f"✓ {strength}")
     
     with col2:
         st.subheader("Areas for Improvement")
         weaknesses = report_data.get('areas_for_improvement', [])
         for weakness in weaknesses:
-            st.write(f"- {weakness}")
+            st.markdown(f"→ {weakness}")
     
-    # Detailed assessments
-    with st.expander("Technical Skills Assessment"):
+    # Detailed assessments in expandable sections
+    with st.expander("Detailed Technical Skills Assessment"):
         tech_skills = report_data.get('technical_skills', {})
         st.write(tech_skills.get('assessment', 'No assessment available'))
         
         st.write("**Strengths:**")
         for strength in tech_skills.get('strengths', []):
-            st.write(f"- {strength}")
+            st.markdown(f"✓ {strength}")
             
-        st.write("**Weaknesses:**")
+        st.write("**Areas to Improve:**")
         for weakness in tech_skills.get('weaknesses', []):
-            st.write(f"- {weakness}")
+            st.markdown(f"→ {weakness}")
     
-    with st.expander("Communication Skills Assessment"):
+    with st.expander("Detailed Communication Skills Assessment"):
         comm_skills = report_data.get('communication_skills', {})
         st.write(comm_skills.get('assessment', 'No assessment available'))
     
-    with st.expander("Problem Solving Assessment"):
+    with st.expander("Detailed Problem Solving Assessment"):
         problem_solving = report_data.get('problem_solving', {})
         st.write(problem_solving.get('assessment', 'No assessment available'))
+        
+    # Export and actions section
+    st.markdown('<div class="section-header">Report Actions</div>', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1,1,1])
+    
+    with col1:
+        st.button("📄 Export Report (PDF)", key="export_pdf")
+    
+    with col2:
+        st.button("📧 Share Report", key="share_report")
+    
+    with col3:
+        if st.button("🏠 Return to Home"):
+            # Clear interview state
+            for key in ['current_interview_id', 'interview_setup_complete', 'interview_complete']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
         
     # Key observations
     with st.expander("Key Observations"):

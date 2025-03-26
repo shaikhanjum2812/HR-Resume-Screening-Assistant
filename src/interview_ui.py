@@ -12,53 +12,191 @@ logger = logging.getLogger(__name__)
 
 def setup_interview_page():
     """Display the initial setup page for interviews"""
-    st.title("New Interview Setup")
+    st.title("AI-Powered Interview System")
+    st.markdown("### Comprehensive skills assessment platform for technical hiring")
     
-    # Layout for job description and resume
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Job Position")
-        job_title = st.text_input("Job Title", key="job_title_input")
+    # Create a container with a light background and padding
+    setup_container = st.container()
+    with setup_container:
+        st.markdown("---")
         
-        st.write("Enter Job Description")
-        job_description = st.text_area(
-            "Provide a detailed job description including required skills and experience",
-            height=300,
-            key="job_description_input"
-        )
-    
-    with col2:
-        st.subheader("Candidate Resume")
+        # Layout for job description and resume
+        col1, col2 = st.columns(2)
         
-        # Option to upload a resume file
-        resume_file = st.file_uploader(
-            "Upload Resume (PDF, DOCX, or TXT)", 
-            type=["pdf", "docx", "txt"],
-            key="resume_file_input"
-        )
-        
-        # Or enter resume text manually
-        st.write("Or enter resume text manually")
-        resume_text = st.text_area(
-            "Paste the candidate's resume text here",
-            height=300,
-            key="resume_text_input"
-        )
-        
-        # Process uploaded file
-        if resume_file is not None:
-            try:
-                with st.spinner("Processing resume..."):
-                    if st.session_state.components.get('utils'):
-                        resume_text = st.session_state.components['utils'].extract_text_from_upload(resume_file)
-                        st.session_state.resume_text = resume_text
-                        st.success("Resume processed successfully")
+        with col1:
+            st.subheader("Job Position")
+            
+            # Define tech roles for dropdown
+            tech_roles = [
+                "Frontend Developer", 
+                "Backend Developer", 
+                "Full Stack Developer",
+                "Data Scientist", 
+                "Machine Learning Engineer",
+                "DevOps Engineer", 
+                "Site Reliability Engineer",
+                "Mobile Developer",
+                "UI/UX Designer",
+                "QA Engineer",
+                "Software Architect",
+                "Product Manager",
+                "Technical Project Manager",
+                "Data Engineer",
+                "Cloud Engineer",
+                "Blockchain Developer",
+                "Security Engineer",
+                "Database Administrator",
+                "Network Engineer",
+                "Other (specify below)"
+            ]
+            
+            # Role selection with dropdown
+            selected_role = st.selectbox(
+                "Select Role/Position", 
+                options=tech_roles,
+                help="Choose the technical role for this interview"
+            )
+            
+            # If "Other" is selected, allow custom entry
+            if selected_role == "Other (specify below)":
+                custom_role = st.text_input("Specify Role", key="custom_role_input")
+                job_title = custom_role if custom_role else "Custom Role"
+            else:
+                job_title = selected_role
+                
+            # Job Description file upload
+            st.subheader("Job Description")
+            jd_file = st.file_uploader(
+                "Upload Job Description (PDF/DOCX)",
+                type=["pdf", "docx"],
+                help="Upload a detailed job description document",
+                key="jd_file_input"
+            )
+            
+            # File validation info
+            if jd_file is not None:
+                col_size, col_type = st.columns(2)
+                with col_size:
+                    file_size_mb = jd_file.size / (1024 * 1024)
+                    if file_size_mb > 5:
+                        st.error(f"File size: {file_size_mb:.2f}MB (exceeds 5MB limit)")
                     else:
-                        st.error("Utils component not initialized")
-            except Exception as e:
-                logger.error(f"Error processing resume file: {str(e)}")
-                st.error(f"Error processing resume file: {str(e)}")
+                        st.success(f"File size: {file_size_mb:.2f}MB")
+                
+                with col_type:
+                    st.success(f"File type: {jd_file.type}")
+                
+                # Process job description file
+                try:
+                    with st.spinner("Extracting job description..."):
+                        if st.session_state.components.get('utils'):
+                            jd_text = st.session_state.components['utils'].extract_text_from_upload(jd_file)
+                            st.session_state.jd_text = jd_text
+                            
+                            # Parse key information from JD
+                            with st.expander("Extracted Job Information (Verify)", expanded=True):
+                                st.write(f"**Job Title:** {job_title}")
+                                if len(jd_text) > 500:
+                                    st.write("**Summary:**")
+                                    st.write(jd_text[:500] + "...")
+                                else:
+                                    st.write(jd_text)
+                                st.success("✓ Job description processed successfully")
+                        else:
+                            st.error("Utils component not initialized")
+                except Exception as e:
+                    logger.error(f"Error processing job description file: {str(e)}")
+                    st.error(f"Error processing job description file: {str(e)}")
+            
+            # Or enter job description manually
+            jd_placeholder = (
+                "Paste the detailed job description here, including:\n"
+                "- Required skills and qualifications\n"
+                "- Responsibilities and duties\n"
+                "- Technical requirements\n"
+                "- Experience level needed"
+            )
+            
+            st.write("Or enter job description manually")
+            job_description = st.text_area(
+                "Job Description Details",
+                height=250,
+                placeholder=jd_placeholder,
+                help="Enter the complete job description with all requirements",
+                key="job_description_input"
+            )
+            
+            # Use processed text if available
+            if jd_file is not None and not job_description.strip() and 'jd_text' in st.session_state:
+                job_description = st.session_state.jd_text
+        
+        with col2:
+            st.subheader("Candidate Resume/CV")
+            
+            # Resume file upload with drag-and-drop
+            resume_file = st.file_uploader(
+                "Upload Resume (PDF/DOCX)",
+                type=["pdf", "docx"],
+                help="Upload the candidate's resume or CV",
+                key="resume_file_input"
+            )
+            
+            # File validation info
+            if resume_file is not None:
+                col_size, col_type = st.columns(2)
+                with col_size:
+                    file_size_mb = resume_file.size / (1024 * 1024)
+                    if file_size_mb > 5:
+                        st.error(f"File size: {file_size_mb:.2f}MB (exceeds 5MB limit)")
+                    else:
+                        st.success(f"File size: {file_size_mb:.2f}MB")
+                
+                with col_type:
+                    st.success(f"File type: {resume_file.type}")
+                
+                # Process resume file
+                try:
+                    with st.spinner("Processing resume..."):
+                        if st.session_state.components.get('utils'):
+                            resume_text = st.session_state.components['utils'].extract_text_from_upload(resume_file)
+                            st.session_state.resume_text = resume_text
+                            
+                            # Parse key information from resume
+                            with st.expander("Extracted Resume Information (Verify)", expanded=True):
+                                if len(resume_text) > 500:
+                                    st.write("**Summary:**")
+                                    st.write(resume_text[:500] + "...")
+                                else:
+                                    st.write(resume_text)
+                                st.success("✓ Resume processed successfully")
+                        else:
+                            st.error("Utils component not initialized")
+                except Exception as e:
+                    logger.error(f"Error processing resume file: {str(e)}")
+                    st.error(f"Error processing resume file: {str(e)}")
+            
+            # Or enter resume text manually
+            resume_placeholder = (
+                "Paste the candidate's resume here, including:\n"
+                "- Work experience\n"
+                "- Education\n"
+                "- Technical skills\n"
+                "- Projects and accomplishments\n"
+                "- Certifications"
+            )
+            
+            st.write("Or enter resume text manually")
+            resume_text = st.text_area(
+                "Resume Content",
+                height=250,
+                placeholder=resume_placeholder,
+                help="Enter the complete resume content",
+                key="resume_text_input"
+            )
+            
+            # Use processed text if available
+            if resume_file is not None and not resume_text.strip() and 'resume_text' in st.session_state:
+                resume_text = st.session_state.resume_text
     
     st.subheader("Interview Configuration")
     num_questions = st.slider(
@@ -229,12 +367,30 @@ def interview_interface():
     # Response input
     if 'response_start_time' not in st.session_state:
         st.session_state.response_start_time = time.time()
+    
+    # Add custom HTML/CSS to disable copy/paste on the text area
+    st.markdown("""
+    <style>
+    .no-copy-paste textarea {
+        user-select: none; /* Standard */
+        -webkit-user-select: none; /* Safari */
+        -ms-user-select: none; /* IE 10+ */
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Create a container with the class for the no-copy-paste styling
+    with st.container():
+        st.markdown('<div class="no-copy-paste">', unsafe_allow_html=True)
+        answer_text = st.text_area(
+            "Enter your response (copy/paste disabled for authentic assessment)",
+            height=200,
+            key=f"response_{current_question['id']}"
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
         
-    answer_text = st.text_area(
-        "Enter your response",
-        height=200,
-        key=f"response_{current_question['id']}"
-    )
+    # Add a note about the copy/paste restriction
+    st.info("📝 **Note:** Copy/paste functionality is disabled to ensure authentic skill assessment.")
     
     col1, col2 = st.columns([1, 1])
     
@@ -660,6 +816,23 @@ def show_interviews():
     if 'view_history' not in st.session_state:
         st.session_state.view_history = False
     
+    # Custom styling for the UI
+    st.markdown("""
+    <style>
+    .main-header {
+        color: #3366ff;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .system-description {
+        text-align: center;
+        color: #666;
+        margin-bottom: 30px;
+        font-style: italic;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     # Determine which view to show
     if st.session_state.view_history:
         show_interview_history()
@@ -668,10 +841,34 @@ def show_interviews():
     elif st.session_state.interview_setup_complete:
         interview_interface()
     else:
-        # Button to view history
-        if st.button("View Interview History"):
-            st.session_state.view_history = True
-            st.rerun()
+        # Display a welcome header before the setup page
+        st.markdown("<h1 class='main-header'>AI-Powered Interview System</h1>", unsafe_allow_html=True)
+        st.markdown("<p class='system-description'>Comprehensive skills assessment platform for technical hiring</p>", unsafe_allow_html=True)
         
-        # Show the setup page
+        # Information box with instructions
+        st.info("""
+        ### How to use this system:
+        1. Select a technical role and provide a job description
+        2. Upload a candidate's resume or paste the text
+        3. Generate tailored technical interview questions
+        4. Conduct the interview with AI-powered evaluation
+        5. Receive a detailed assessment report with hiring recommendations
+        """)
+        
+        # Create two columns for actions
+        col1, col2 = st.columns(2)
+        
+        # Button to view history in the first column
+        with col1:
+            if st.button("📋 View Interview History", key="view_history_btn"):
+                st.session_state.view_history = True
+                st.rerun()
+        
+        # Button to create new interview in the second column
+        with col2:
+            if st.button("🚀 Start New Interview", key="start_new_btn"):
+                # This will show the setup page below
+                pass
+        
+        # Show the setup page regardless
         setup_interview_page()

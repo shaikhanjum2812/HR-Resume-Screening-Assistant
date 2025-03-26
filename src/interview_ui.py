@@ -1207,8 +1207,7 @@ def show_interview_history():
                     del st.session_state[key]
             st.rerun()
     
-    # Add a subtitle explaining the new interview option
-    st.markdown("<div style='text-align: center; color: #666; margin-top: 10px; font-size: 0.9em;'>Create a new interview session with customized questions based on job description and resume</div>", unsafe_allow_html=True)
+    # No subtitle needed
 
 def show_interviews():
     """Main interview system page"""

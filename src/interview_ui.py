@@ -1024,6 +1024,17 @@ def show_interview_history():
     """Display the interview history page"""
     st.title("Interview History")
     
+    # Add a container with custom styling for the buttons
+    st.markdown("""
+    <style>
+    .history-button {
+        width: 100%;
+        margin-top: 10px;
+        margin-bottom: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     try:
         # Tabs for completed and in-progress interviews
         tab1, tab2 = st.tabs(["Completed Interviews", "In-Progress Interviews"])
@@ -1051,18 +1062,25 @@ def show_interview_history():
                     df = pd.DataFrame(df_data)
                     st.dataframe(df, use_container_width=True)
                     
-                    # Allow selecting interview to view
-                    selected_id = st.selectbox(
-                        "Select interview to view details",
-                        options=[interview['id'] for interview in completed_interviews],
-                        format_func=lambda x: f"ID: {x} - {next((i['job_title'] for i in completed_interviews if i['id'] == x), 'Unknown')}"
-                    )
+                    st.subheader("View Completed Interview Report")
+                    col1, col2 = st.columns([3, 1])
                     
-                    if st.button("View Selected Interview"):
-                        st.session_state.current_interview_id = selected_id
-                        st.session_state.interview_setup_complete = True
-                        st.session_state.interview_complete = True
-                        st.rerun()
+                    with col1:
+                        # Allow selecting interview to view
+                        selected_id = st.selectbox(
+                            "Select interview to view details",
+                            options=[interview['id'] for interview in completed_interviews],
+                            format_func=lambda x: f"ID: {x} - {next((i['job_title'] for i in completed_interviews if i['id'] == x), 'Unknown')}",
+                            key="completed_select"
+                        )
+                    
+                    with col2:
+                        # Ensure button is prominently displayed
+                        if st.button("📋 View Report", key="view_completed", use_container_width=True):
+                            st.session_state.current_interview_id = selected_id
+                            st.session_state.interview_setup_complete = True
+                            st.session_state.interview_complete = True
+                            st.rerun()
         
         with tab2:
             # Get in-progress interviews
@@ -1085,18 +1103,25 @@ def show_interview_history():
                         df = pd.DataFrame(df_data)
                         st.dataframe(df, use_container_width=True)
                         
-                        # Allow selecting interview to continue
-                        selected_id = st.selectbox(
-                            "Select interview to continue",
-                            options=[interview['id'] for interview in in_progress_interviews],
-                            format_func=lambda x: f"ID: {x} - {next((i['job_title'] for i in in_progress_interviews if i['id'] == x), 'Unknown')}"
-                        )
+                        st.subheader("Continue In-Progress Interview")
+                        col1, col2 = st.columns([3, 1])
                         
-                        if st.button("Continue Selected Interview"):
-                            st.session_state.current_interview_id = selected_id
-                            st.session_state.interview_setup_complete = True
-                            st.session_state.interview_complete = False
-                            st.rerun()
+                        with col1:
+                            # Allow selecting interview to continue
+                            selected_id = st.selectbox(
+                                "Select interview to continue",
+                                options=[interview['id'] for interview in in_progress_interviews],
+                                format_func=lambda x: f"ID: {x} - {next((i['job_title'] for i in in_progress_interviews if i['id'] == x), 'Unknown')}",
+                                key="in_progress_select"
+                            )
+                        
+                        with col2:
+                            # Ensure button is prominently displayed
+                            if st.button("▶️ Continue", key="continue_interview", use_container_width=True):
+                                st.session_state.current_interview_id = selected_id
+                                st.session_state.interview_setup_complete = True
+                                st.session_state.interview_complete = False
+                                st.rerun()
             except Exception as e:
                 logger.error(f"Error loading in-progress interviews: {str(e)}")
                 st.error("Could not load in-progress interviews")
@@ -1105,13 +1130,32 @@ def show_interview_history():
         logger.error(f"Error displaying interview history: {str(e)}")
         st.error(f"Error displaying interview history: {str(e)}")
     
-    # Button to start new interview
-    if st.button("Start New Interview"):
-        # Clear interview state to start fresh
-        for key in ['current_interview_id', 'interview_setup_complete', 'interview_complete']:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.rerun()
+    # Create a visual separator
+    st.markdown("---")
+    
+    # Add navigation buttons
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Return to Home button
+        if st.button("🏠 Return to Home", key="return_home", use_container_width=True):
+            # Clear all interview state
+            for key in ['current_interview_id', 'interview_setup_complete', 'interview_complete', 'view_history', 'interview_start_time', 'response_start_time']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+    
+    with col2:
+        # Add a more prominent "Start New Interview" button
+        if st.button("🆕 Start New Interview", key="start_new", use_container_width=True):
+            # Clear interview state to start fresh
+            for key in ['current_interview_id', 'interview_setup_complete', 'interview_complete', 'view_history', 'interview_start_time', 'response_start_time']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+    
+    # Add a subtitle explaining the new interview option
+    st.markdown("<div style='text-align: center; color: #666; margin-top: 10px; font-size: 0.9em;'>Create a new interview session with customized questions based on job description and resume</div>", unsafe_allow_html=True)
 
 def show_interviews():
     """Main interview system page"""
@@ -1170,6 +1214,10 @@ def show_interviews():
         # Button to view history in the first column
         with col1:
             if st.button("📋 View Interview History", key="view_history_btn"):
+                # Clear existing interview state but keep view_history
+                for key in ['current_interview_id', 'interview_setup_complete', 'interview_complete', 'interview_start_time', 'response_start_time']:
+                    if key in st.session_state:
+                        del st.session_state[key]
                 st.session_state.view_history = True
                 st.rerun()
         

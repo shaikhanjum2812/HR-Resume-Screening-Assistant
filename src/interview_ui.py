@@ -1249,7 +1249,6 @@ def show_interviews():
     else:
         # Display a welcome header before the setup page
         st.markdown("<h1 class='main-header'>Candidate Assessment</h1>", unsafe_allow_html=True)
-        st.markdown("<p class='system-description'>Comprehensive skills assessment platform for technical hiring</p>", unsafe_allow_html=True)
         
         # Information box with instructions
         st.info("""

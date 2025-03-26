@@ -661,6 +661,22 @@ class Database:
             return [dict(row) for row in result]
         return []
         
+    # Import the new interview system methods
+    from database_methods import create_new_interview, save_interview_questions_new, get_interview_questions_new
+    from database_methods import save_interview_answer, get_interview_answers, complete_interview
+    from database_methods import get_interview_details, get_completed_interviews_new, get_in_progress_interviews
+    
+    # Add methods to the class
+    create_new_interview = create_new_interview
+    save_interview_questions_new = save_interview_questions_new
+    get_interview_questions_new = get_interview_questions_new
+    save_interview_answer = save_interview_answer
+    get_interview_answers = get_interview_answers
+    complete_interview = complete_interview
+    get_interview_details = get_interview_details
+    get_completed_interviews_new = get_completed_interviews_new
+    get_in_progress_interviews = get_in_progress_interviews
+        
     def get_completed_interviews(self):
         """Get all completed interview sessions"""
         query = '''

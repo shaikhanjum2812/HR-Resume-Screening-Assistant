@@ -10,8 +10,79 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+def add_accessibility_controls():
+    """Add accessibility controls to the sidebar"""
+    with st.sidebar.expander("Accessibility Options", expanded=False):
+        # Font size controls
+        st.write("**Font Size**")
+        font_size = st.select_slider(
+            "Adjust font size",
+            options=["Small", "Medium", "Large", "X-Large"],
+            value="Medium"
+        )
+        
+        # Set font sizes based on selection
+        font_sizes = {
+            "Small": "0.9rem",
+            "Medium": "1rem",
+            "Large": "1.2rem",
+            "X-Large": "1.4rem"
+        }
+        
+        # High contrast mode
+        high_contrast = st.checkbox("High Contrast Mode")
+        
+        # Voice-to-text option (simulated for now)
+        voice_to_text = st.checkbox("Enable Voice-to-Text Input")
+        
+        # Apply accessibility settings
+        bg_color = "#ffffff"
+        text_color = "#000000"
+        
+        if high_contrast:
+            bg_color = "#000000"
+            text_color = "#ffffff"
+        
+        # Store accessibility preferences in session state
+        st.session_state.accessibility = {
+            "font_size": font_sizes[font_size],
+            "high_contrast": high_contrast,
+            "voice_to_text": voice_to_text,
+            "bg_color": bg_color,
+            "text_color": text_color
+        }
+        
+        # Apply CSS for accessibility
+        st.markdown(f"""
+        <style>
+        body {{
+            font-size: {font_sizes[font_size]};
+        }}
+        
+        .stApp {{
+            background-color: {bg_color};
+            color: {text_color};
+        }}
+        
+        .high-contrast {{
+            background-color: {bg_color} !important;
+            color: {text_color} !important;
+        }}
+        
+        /* Make text areas and buttons more accessible */
+        .stTextArea textarea {{
+            font-size: {font_sizes[font_size]};
+            padding: 10px;
+            line-height: 1.5;
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+
 def setup_interview_page():
     """Display the initial setup page for interviews"""
+    # Add accessibility controls
+    add_accessibility_controls()
+    
     st.title("AI-Powered Interview System")
     st.markdown("### Comprehensive skills assessment platform for technical hiring")
     
@@ -379,18 +450,86 @@ def interview_interface():
     </style>
     """, unsafe_allow_html=True)
 
+    # Get accessibility settings if available
+    voice_to_text_enabled = False
+    if 'accessibility' in st.session_state:
+        voice_to_text_enabled = st.session_state.accessibility.get('voice_to_text', False)
+    
+    # Show voice-to-text option if enabled
+    if voice_to_text_enabled:
+        st.info("🎤 **Voice-to-Text is enabled**. Click the button below to start recording.")
+        
+        # Voice input button (simulated functionality)
+        voice_col1, voice_col2 = st.columns([1, 3])
+        with voice_col1:
+            if st.button("🎤 Record", key="voice_record"):
+                with st.spinner("Recording... (simulated)"):
+                    # Simulate recording for 3 seconds
+                    time.sleep(2)
+                    # In a real implementation, this would capture audio and convert to text
+                    if 'voice_text' not in st.session_state:
+                        st.session_state.voice_text = "Voice input would be transcribed and appear here."
+                    else:
+                        st.session_state.voice_text += " Additional voice input would be added here."
+        
+        with voice_col2:
+            if st.button("❌ Clear", key="voice_clear"):
+                if 'voice_text' in st.session_state:
+                    del st.session_state.voice_text
+    
     # Create a container with the class for the no-copy-paste styling
     with st.container():
         st.markdown('<div class="no-copy-paste">', unsafe_allow_html=True)
+        
+        # Pre-fill with voice text if available
+        initial_value = ""
+        if voice_to_text_enabled and 'voice_text' in st.session_state:
+            initial_value = st.session_state.voice_text
+            
         answer_text = st.text_area(
             "Enter your response (copy/paste disabled for authentic assessment)",
+            value=initial_value,
             height=200,
             key=f"response_{current_question['id']}"
         )
         st.markdown('</div>', unsafe_allow_html=True)
         
+        # Character counter
+        char_count = len(answer_text)
+        max_chars = 3000
+        char_percentage = min(100, (char_count / max_chars) * 100)
+        
+        # Show character counter with warning colors when approaching limit
+        counter_color = "green"
+        if char_percentage > 80:
+            counter_color = "orange"
+        if char_percentage > 95:
+            counter_color = "red"
+            
+        st.markdown(f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: -15px;">
+            <span style="color: {counter_color}; font-size: 0.8rem;">
+                {char_count}/{max_chars} characters
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+        
     # Add a note about the copy/paste restriction
     st.info("📝 **Note:** Copy/paste functionality is disabled to ensure authentic skill assessment.")
+    
+    # Timer display
+    current_time = time.time()
+    elapsed_seconds = int(current_time - st.session_state.response_start_time)
+    minutes, seconds = divmod(elapsed_seconds, 60)
+    
+    # Format time display
+    time_display = f"{minutes:02d}:{seconds:02d}"
+    st.markdown(f"""
+    <div style="position: absolute; top: 70px; right: 30px; background-color: #f0f2f6; padding: 8px 12px; 
+         border-radius: 4px; font-size: 1.1rem; font-weight: bold;">
+        ⏱️ {time_display}
+    </div>
+    """, unsafe_allow_html=True)
     
     col1, col2 = st.columns([1, 1])
     

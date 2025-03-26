@@ -175,28 +175,12 @@ def setup_interview_page():
                 logger.error(f"Error processing resume file: {str(e)}")
                 st.error(f"Error processing resume file: {str(e)}")
         
-        # Or enter resume text manually
-        resume_placeholder = (
-            "Paste the candidate's resume here, including:\n"
-            "- Work experience\n"
-            "- Education\n"
-            "- Technical skills\n"
-            "- Projects and accomplishments\n"
-            "- Certifications"
-        )
-        
-        st.write("Or enter resume text manually")
-        resume_text = st.text_area(
-            "Resume Content",
-            height=250,
-            placeholder=resume_placeholder,
-            help="Enter the complete resume content",
-            key="resume_text_input"
-        )
-        
         # Use processed text if available
-        if resume_file is not None and not resume_text.strip() and 'resume_text' in st.session_state:
+        if resume_file is not None and 'resume_text' in st.session_state:
             resume_text = st.session_state.resume_text
+        else:
+            # Initialize resume_text as empty string if no file is uploaded
+            resume_text = ""
         
         # Third: Job Description
         st.markdown("---")
@@ -286,16 +270,16 @@ def setup_interview_page():
                 st.error("Job description is required")
                 return
                 
-            if not resume_text.strip() and resume_file is None:
-                st.error("Please either upload a resume or enter resume text")
+            if resume_file is None:
+                st.error("Please upload a candidate resume/CV")
                 return
                 
-            # If we have file but not text, ensure text is extracted
+            # If we have file but text extraction failed
             if resume_file is not None and not resume_text.strip():
                 if 'resume_text' in st.session_state:
                     resume_text = st.session_state.resume_text
                 else:
-                    st.error("Failed to process resume. Please enter resume text manually.")
+                    st.error("Failed to process resume. Please try uploading the file again or try a different file format.")
                     return
                 
             # Create new interview in the database

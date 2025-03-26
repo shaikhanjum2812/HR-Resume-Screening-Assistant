@@ -847,7 +847,7 @@ def sidebar():
         'Home': 'home',
         'Job Descriptions': 'jobs',
         'Resume Evaluation': 'evaluation',
-        'SAP Interviews': 'interviews',
+        'Interview Hub': 'interviews',
         'Past Evaluations': 'past_evaluations',
         'Analytics': 'analytics'
     }

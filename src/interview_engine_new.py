@@ -443,29 +443,28 @@ class InterviewEngine:
         except Exception as e:
             logger.error(f"Error generating final report: {str(e)}")
             
-            # Define default values to avoid "possibly unbound" errors
-            default_completion_rate = 0
-            try:
-                # Try to use the existing completion_rate if it exists
-                completion_percentage = int(completion_rate * 100)
-            except:
-                # Otherwise use the default value
-                completion_percentage = 0
-                
-            default_scores = {
-                "overall": 0,
-                "technical": 0,
-                "scenario": 0,
-                "behavioral": 0,
-                "problem_solving": 0
+            # Initialize default values before any error handling
+            completion_rate = 0
+            formatted_data = {
+                "scores": {
+                    "overall": 0,
+                    "technical": 0,
+                    "scenario": 0,
+                    "behavioral": 0,
+                    "problem_solving": 0
+                }
             }
             
+            # Calculate completion percentage
             try:
-                # Try to use the existing scores if they exist
-                scores = formatted_data["scores"]
-            except:
-                # Otherwise use the default scores
-                scores = default_scores
+                # Use the completion_rate defined in the try block above
+                completion_percentage = int(completion_rate * 100)
+            except Exception:
+                # Default to 0 if there was an error
+                completion_percentage = 0
+                
+            # Use the scores from formatted_data
+            scores = formatted_data["scores"]
             
             # Return a basic structure in case of failure
             return {
@@ -490,5 +489,5 @@ class InterviewEngine:
                 "recommendation": "Unable to determine",
                 "reasoning": f"An error occurred during the final assessment: {str(e)}",
                 "scores": scores,
-                "completion_rate": default_completion_rate if 'completion_rate' not in locals() else completion_rate
+                "completion_rate": completion_rate
             }

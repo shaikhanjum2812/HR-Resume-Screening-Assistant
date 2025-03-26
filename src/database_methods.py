@@ -305,6 +305,34 @@ def complete_interview(self, interview_id, report_data):
         # Extract scores from the report data
         scores = report_data.get('scores', {})
         
+        # First, get the interview start time to calculate duration
+        start_time_query = """
+            SELECT start_time FROM interviews_new WHERE id = %s
+        """
+        start_time_result = self.execute_query(start_time_query, (interview_id,))
+        
+        end_time = datetime.now()
+        
+        # Calculate interview duration if start time exists
+        if start_time_result and len(start_time_result) > 0 and start_time_result[0][0]:
+            start_time = start_time_result[0][0]
+            duration_seconds = (end_time - start_time).total_seconds()
+            
+            # Format duration as readable string (e.g., "45 minutes 20 seconds")
+            minutes, seconds = divmod(int(duration_seconds), 60)
+            hours, minutes = divmod(minutes, 60)
+            
+            if hours > 0:
+                duration_str = f"{hours} hour{'s' if hours != 1 else ''} {minutes} minute{'s' if minutes != 1 else ''}"
+            else:
+                duration_str = f"{minutes} minute{'s' if minutes != 1 else ''} {seconds} second{'s' if seconds != 1 else ''}"
+            
+            # Add duration to report data
+            report_data['interview_duration'] = duration_str
+        else:
+            # Default duration if start time is not available
+            report_data['interview_duration'] = "Unknown"
+        
         query = """
             UPDATE interviews_new
             SET 
@@ -326,7 +354,7 @@ def complete_interview(self, interview_id, report_data):
         self.execute_query(
             query,
             (
-                datetime.now(),
+                end_time,
                 scores.get('overall', 0),
                 scores.get('technical', 0),
                 scores.get('problem_solving', 0),

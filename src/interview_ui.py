@@ -365,6 +365,19 @@ def interview_interface():
     interview = None
     questions = None
     
+    # Initialize interview timer if not present
+    if 'interview_start_time' not in st.session_state:
+        st.session_state.interview_start_time = time.time()
+    
+    # Function to format elapsed time
+    def format_elapsed_time(seconds):
+        minutes, seconds = divmod(int(seconds), 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours > 0:
+            return f"{hours}h {minutes}m {seconds}s"
+        else:
+            return f"{minutes}m {seconds}s"
+    
     try:
         # Get interview details
         interview = st.session_state.components['db'].get_interview_details(interview_id)
@@ -373,6 +386,8 @@ def interview_interface():
             st.error("Interview session not found")
             if st.button("Return to Setup"):
                 st.session_state.interview_setup_complete = False
+                if 'interview_start_time' in st.session_state:
+                    del st.session_state.interview_start_time
                 st.rerun()
             return
         
@@ -383,6 +398,8 @@ def interview_interface():
             st.error("No questions found for this interview")
             if st.button("Return to Setup"):
                 st.session_state.interview_setup_complete = False
+                if 'interview_start_time' in st.session_state:
+                    del st.session_state.interview_start_time
                 st.rerun()
             return
             
@@ -391,6 +408,8 @@ def interview_interface():
         st.error(f"Error loading interview: {str(e)}")
         if st.button("Return to Setup"):
             st.session_state.interview_setup_complete = False
+            if 'interview_start_time' in st.session_state:
+                del st.session_state.interview_start_time
             st.rerun()
         return
     
@@ -517,17 +536,28 @@ def interview_interface():
     # Add a note about the copy/paste restriction
     st.info("📝 **Note:** Copy/paste functionality is disabled to ensure authentic skill assessment.")
     
-    # Timer display
+    # Timer displays - both question timer and total interview timer
     current_time = time.time()
-    elapsed_seconds = int(current_time - st.session_state.response_start_time)
-    minutes, seconds = divmod(elapsed_seconds, 60)
     
-    # Format time display
-    time_display = f"{minutes:02d}:{seconds:02d}"
+    # Question timer (current question response time)
+    question_elapsed_seconds = int(current_time - st.session_state.response_start_time)
+    q_minutes, q_seconds = divmod(question_elapsed_seconds, 60)
+    question_time_display = f"{q_minutes:02d}:{q_seconds:02d}"
+    
+    # Total interview timer
+    total_elapsed_seconds = int(current_time - st.session_state.interview_start_time)
+    total_time = format_elapsed_time(total_elapsed_seconds)
+    
+    # Display both timers
     st.markdown(f"""
     <div style="position: absolute; top: 70px; right: 30px; background-color: #f0f2f6; padding: 8px 12px; 
          border-radius: 4px; font-size: 1.1rem; font-weight: bold;">
-        ⏱️ {time_display}
+        ⏱️ Question: {question_time_display}
+    </div>
+    
+    <div style="position: absolute; top: 130px; right: 30px; background-color: #e9ecef; padding: 8px 12px; 
+         border-radius: 4px; font-size: 0.9rem;">
+        Total interview time: {total_time}
     </div>
     """, unsafe_allow_html=True)
     

@@ -7,7 +7,7 @@ import logging
 import json
 import time
 from typing import Dict, List, Any, Optional
-import openai
+from openai import OpenAI
 import random
 
 # Configure logging
@@ -23,7 +23,7 @@ class InterviewEngine:
         if not api_key:
             logger.warning("OPENAI_API_KEY not found in environment variables.")
             
-        self.client = openai.OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key)
         self.model = "gpt-4o"  # Use GPT-4o for best performance
         
     def generate_questions(self, 
